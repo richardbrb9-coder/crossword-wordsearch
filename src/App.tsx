@@ -103,9 +103,21 @@ function App() {
     try {
       const selectedTheme = settings.theme || 'all';
       const themeData = THEMES[selectedTheme];
-      const wordsPool = (selectedTheme !== 'all' && themeData && themeData.words.length > 0)
+      const themeWords = (selectedTheme !== 'all' && themeData && themeData.words.length > 0)
         ? themeData.words
         : activeWords;
+
+      // Ensure wordsPool has plenty of candidates for the chosen difficulty
+      const diffMatches = themeWords.filter(w => {
+        const len = w.word.length;
+        if (settings.difficulty === 'easy') return len >= 3 && len <= 6;
+        if (settings.difficulty === 'medium') return len >= 5 && len <= 10;
+        return len >= 7 && len <= 15;
+      });
+
+      const wordsPool = (diffMatches.length < settings.wordCount * 1.5 && activeWords.length > 0)
+        ? [...themeWords, ...activeWords]
+        : themeWords;
 
       const themeTitle = themeData ? `${themeData.icon} ${themeData.name}` : '🎯 Kids';
 
