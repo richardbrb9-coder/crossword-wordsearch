@@ -1,0 +1,85 @@
+.wordsearch-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+
+.wordsearch-content {
+  display: flex;
+  gap: 30px;
+  max-width: 900px;
+  width: 100%;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.ws-grid {
+  display: grid;
+  gap: 6px;
+  background: #222;
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+}
+
+.ws-cell {
+  aspect-ratio: 1;
+  width: 45px; /* Large touch target for little fingers on tablets */
+  background: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease-in-out;
+  user-select: none;
+}
+
+.ws-cell:active {
+  transform: scale(0.95);
+}
+
+.ws-wordbank {
+  display: flex;
+  flex-direction: column; /* Forces the heading to sit directly above the list */
+  background: rgba(255, 255, 255, 0.05);
+  padding: 20px 30px 20px 20px;
+  border-radius: 12px;
+  min-width: 200px;
+  width: max-content;
+  flex-shrink: 0;
+}
+
+.ws-wordbank h3 {
+  margin: 0 0 15px 0; /* Adds breathing room between the heading and the first word */
+  color: #fff;
+  border-bottom: 2px solid rgba(255,255,255,0.1);
+  padding-bottom: 8px;
+  text-align: left; /* Keeps it aligned nicely with your bullet points */
+}
+
+.ws-wordbank ul {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0 0;
+}
+
+.ws-wordbank li {
+  display: list-item;
+  list-style-position: outside;
+  margin-left: 20px; /* Creates room for the bullet so it doesn't get squished */
+  padding: 6px 0;
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+  white-space: nowrap; /* Prevents the text from ever wrapping below the bullet */
+}
+
+.ws-found-word {
+  text-decoration: line-through;
+  opacity: 0.85;
+}

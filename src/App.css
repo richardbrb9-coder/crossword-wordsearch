@@ -1,0 +1,209 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #1a1a2e;
+  color: #fff;
+  min-height: 100vh;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+/* Opening Screen */
+.opening-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background: url('/background.jpg') no-repeat center center/cover;
+  background-color: #1a1a2e;
+  padding: 2rem;
+}
+
+.opening-screen .content {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  padding: 3rem;
+  border-radius: 20px;
+  text-align: center;
+  max-width: 600px;
+}
+
+.opening-screen h1 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.opening-screen p {
+  font-size: 1.2rem;
+  color: #ccc;
+  margin-bottom: 2rem;
+}
+
+.start-button {
+  background: linear-gradient(135deg, #feca57, #ff6b6b);
+  border: none;
+  padding: 1rem 2.5rem;
+  font-size: 1.3rem;
+  color: #1a1a2e;
+  font-weight: bold;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 5px 20px rgba(254, 202, 87, 0.4);
+}
+
+.start-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(254, 202, 87, 0.6);
+}
+
+.start-button:active {
+  transform: translateY(-1px);
+}
+
+/* Selection Screen */
+.selection-screen {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background: rgba(26, 26, 46, 0.9);
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.selection-screen h1 {
+  text-align: center;
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+  background: linear-gradient(135deg, #ff6b6b, #feca57);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #aaa;
+  font-size: 1rem;
+}
+
+.form-group select {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.form-group select:hover {
+  border-color: #feca57;
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: #feca57;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.start-game-button {
+  width: 100%;
+  background: linear-gradient(135deg, #48dbfb, #0abde3);
+  border: none;
+  padding: 1rem;
+  font-size: 1.2rem;
+  color: #1a1a2e;
+  font-weight: bold;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 1rem;
+}
+
+.start-game-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 20px rgba(72, 219, 251, 0.4);
+}
+
+.start-game-button:active {
+  transform: translateY(-1px);
+}
+
+.start-game-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Game Screen Layout Container */
+.game-screen {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.game-screen .message {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1rem 2rem;
+  border-radius: 10px;
+  z-index: 1000;
+  animation: slideDown 0.3s ease;
+  font-weight: bold;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message.info {
+  background: rgba(72, 219, 251, 0.9);
+  color: #1a1a2e;
+}
+
+.message.success {
+  background: rgba(46, 204, 113, 0.9);
+  color: white;
+}
+
+.message.error {
+  background: rgba(231, 76, 60, 0.9);
+  color: white;
+}
+
+.message.feedback {
+  background: rgba(252, 220, 76, 0.9);
+  color: #1a1a2e;
+}
