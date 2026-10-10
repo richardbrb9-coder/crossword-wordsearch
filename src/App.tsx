@@ -47,10 +47,26 @@ function App() {
   }, []);
 
   const [isMuted, setIsMuted] = useState(soundService.isMuted());
+  const [colorTheme, setColorTheme] = useState<'bright' | 'dark'>(() => {
+    try {
+      return (localStorage.getItem('puzzle_color_theme') as 'bright' | 'dark') || 'bright';
+    } catch {
+      return 'bright';
+    }
+  });
 
   const toggleSound = () => {
     const muted = soundService.toggleMute();
     setIsMuted(muted);
+  };
+
+  const toggleColorTheme = () => {
+    soundService.playTap();
+    const next = colorTheme === 'bright' ? 'dark' : 'bright';
+    setColorTheme(next);
+    try {
+      localStorage.setItem('puzzle_color_theme', next);
+    } catch {}
   };
 
   const handleSelect = async (
@@ -125,35 +141,26 @@ function App() {
   };
 
   return (
-    <div className="app">
-      {/* Sound Mute/Unmute Toggle */}
-      <button 
-        type="button"
-        onClick={toggleSound}
-        className="sound-toggle-btn"
-        title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
-        style={{
-          position: 'fixed',
-          top: '12px',
-          right: '16px',
-          zIndex: 9999,
-          background: 'rgba(255, 255, 255, 0.15)',
-          backdropFilter: 'blur(6px)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          borderRadius: '50%',
-          width: '42px',
-          height: '42px',
-          cursor: 'pointer',
-          fontSize: '1.25rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#fff',
-          transition: 'transform 0.2s ease',
-        }}
-      >
-        {isMuted ? '🔇' : '🔊'}
-      </button>
+    <div className="app" data-theme={colorTheme}>
+      {/* Top Action Controls: Theme & Sound */}
+      <div className="top-controls">
+        <button 
+          type="button"
+          onClick={toggleColorTheme}
+          className="control-btn"
+          title={colorTheme === 'bright' ? 'Switch to Dark Mode 🌙' : 'Switch to Bright Mode ☀️'}
+        >
+          {colorTheme === 'bright' ? '🌙' : '☀️'}
+        </button>
+        <button 
+          type="button"
+          onClick={toggleSound}
+          className="control-btn"
+          title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+        >
+          {isMuted ? '🔇' : '🔊'}
+        </button>
+      </div>
 
       {screen === 'opening' && (
         <OpeningScreen onStart={handleStart} />
