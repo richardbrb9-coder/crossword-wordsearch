@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Puzzle, Difficulty } from '@/types';
+import { Puzzle, Difficulty, PuzzleTheme } from '@/types';
 import OpeningScreen from './components/OpeningScreen';
 import SelectionScreen from './components/SelectionScreen';
 import GameScreen from './components/GameScreen';
@@ -9,6 +9,7 @@ import './App.css';
 import { loadData } from './services/dataLoader.ts';
 import { generateCrossword, generateWordSearch } from './services/puzzleGenerator';
 import { soundService } from './services/soundService';
+import { THEMES } from './data/themes';
 
 function App() {
   const [screen, setScreen] = useState<'opening' | 'selection' | 'loading' | 'game'>('opening');
@@ -57,6 +58,7 @@ function App() {
       puzzleType: 'crossword' | 'wordsearch';
       difficulty: Difficulty;
       wordCount: number;
+      theme: PuzzleTheme;
     }
   ): Promise<void> => {
     let activeWords = wordBank;
@@ -83,25 +85,35 @@ function App() {
     }
     
     try {
+      const selectedTheme = settings.theme || 'all';
+      const themeData = THEMES[selectedTheme];
+      const wordsPool = (selectedTheme !== 'all' && themeData && themeData.words.length > 0)
+        ? themeData.words
+        : activeWords;
+
+      const themeTitle = themeData ? `${themeData.icon} ${themeData.name}` : '🎯 Kids';
+
       if (settings.puzzleType === 'crossword') {
         const puzzle = generateCrossword(
-          activeWords,
+          wordsPool,
           settings.difficulty,
-          `Kids ${settings.difficulty.toUpperCase()} Crossword`,
+          `${themeTitle} Crossword`,
           15,
           15,
           settings.wordCount
         );
+        puzzle.theme = selectedTheme;
         setSelectedPuzzle(puzzle);
         setScreen('game');
       } else {
         const puzzle = generateWordSearch(
-          activeWords,
+          wordsPool,
           settings.difficulty,
-          `Kids ${settings.difficulty.toUpperCase()} Word Search`,
+          `${themeTitle} Word Search`,
           12,
           settings.wordCount
         );
+        puzzle.theme = selectedTheme;
         setSelectedPuzzle(puzzle);
         setScreen('game');
       }

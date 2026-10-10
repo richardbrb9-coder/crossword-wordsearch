@@ -1,6 +1,7 @@
 // Data structures for the Word Puzzle App
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
+export type PuzzleTheme = 'all' | 'animals' | 'space' | 'food' | 'fantasy' | 'sports';
 
 export type WordEntry = {
   word: string;

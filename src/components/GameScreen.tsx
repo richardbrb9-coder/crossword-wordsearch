@@ -25,6 +25,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
   const [progress, setProgress] = useState(0);
   const [gridData, setGridData] = useState<GridCell[][]>([]);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [hintsUsed, setHintsUsed] = useState(0);
 
   const [activeClue, setActiveClue] = useState<Clue | null>(null);
   const [modalInput, setModalInput] = useState('');
@@ -64,8 +65,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
     }
   }, [puzzle]);
 
+  const totalClues = puzzle.type === 'crossword' ? puzzle.clues.across.length + puzzle.clues.down.length : 0;
+
   useEffect(() => {
-    const totalClues = puzzle.type === 'crossword' ? puzzle.clues.across.length + puzzle.clues.down.length : 0;
     const correctCount = Object.keys(userAnswers).length;
     const currentProgress = totalClues > 0 ? Math.round((correctCount / totalClues) * 100) : 0;
     setProgress(currentProgress);
@@ -75,7 +77,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
       soundService.playFanfare();
       confetti({ particleCount: 200, spread: 90, origin: { y: 0.5 }, zIndex: 9999 });
     }
-  }, [userAnswers, puzzle, isCompleted]);
+  }, [userAnswers, puzzle, isCompleted, totalClues]);
 
   const getVisibleLetter = (cell: GridCell): string => {
     if (cell.isBlocked) return '';
@@ -153,11 +155,41 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
     }
   };
 
-  // Typewriter Reveal Function
+  // Hint: Reveal just 1 letter
+  const handleRevealOneLetter = () => {
+    if (!activeClue || isRevealing) return;
+    const answer = activeClue.answer.toUpperCase();
+    let current = modalInput.toUpperCase();
+
+    if (current.length < answer.length) {
+      current += answer[current.length];
+    } else {
+      for (let i = 0; i < answer.length; i++) {
+        if (current[i] !== answer[i]) {
+          current = current.slice(0, i) + answer[i] + current.slice(i + 1);
+          break;
+        }
+      }
+    }
+
+    setModalInput(current);
+    setHintsUsed(prev => prev + 1);
+    soundService.playReveal();
+
+    if (current === answer) {
+      soundService.playSuccess();
+      setModalMessage({ text: '✓ Fully Solved with Hint!', type: 'success' });
+      setUserAnswers(prev => ({ ...prev, [activeClue.id]: answer }));
+      setTimeout(() => closeModal(), 1200);
+    }
+  };
+
+  // Typewriter Reveal Entire Word
   const handleRevealAnswer = () => {
     if (!activeClue || isRevealing) return;
     
     setIsRevealing(true);
+    setHintsUsed(prev => prev + 3);
     soundService.playReveal();
     setModalInput('');
     setModalMessage({ text: 'Revealing word...', type: 'info' });
@@ -182,6 +214,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
     }, 300);
   };
 
+  const calculateStars = (): number => {
+    if (hintsUsed === 0) return 3;
+    if (hintsUsed <= 2) return 2;
+    return 1;
+  };
+
   return (
     <div className="game-screen">
       <div className="game-header" style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', alignItems: 'center' }}>
@@ -196,7 +234,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
             <div className="progress-bar">
               <div className="progress-fill" style={{ width: `${progress}%` }} />
             </div>
-            <span className="progress-text">{progress}% solved</span>
+            <span className="progress-text">{progress}% solved ({Object.keys(userAnswers).length}/{totalClues})</span>
           </div>
         )}
       </div>
@@ -319,20 +357,29 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
 
             {modalMessage && <div className={`result-message ${modalMessage.type}`}>{modalMessage.text}</div>}
 
-            <div className="button-group" style={{ marginTop: '1.5rem', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <div className="button-group" style={{ marginTop: '1.5rem', display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button 
                 className="btn-validate" 
                 onClick={handleCheckAnswer} 
                 disabled={isRevealing || modalInput.trim().length === 0}
-                style={{ background: '#28a745', color: 'white', padding: '10px 18px', borderRadius: '8px', border: 'none', cursor: isRevealing ? 'not-allowed' : 'pointer', opacity: isRevealing ? 0.6 : 1 }}
+                style={{ background: '#28a745', color: 'white', padding: '10px 16px', borderRadius: '8px', border: 'none', cursor: isRevealing ? 'not-allowed' : 'pointer', opacity: isRevealing ? 0.6 : 1, fontWeight: 'bold' }}
               >
                 Check Answer
+              </button>
+              <button 
+                type="button"
+                onClick={handleRevealOneLetter} 
+                disabled={isRevealing}
+                style={{ background: '#17a2b8', color: 'white', padding: '10px 14px', borderRadius: '8px', border: 'none', cursor: isRevealing ? 'not-allowed' : 'pointer', opacity: isRevealing ? 0.6 : 1, fontWeight: 'bold' }}
+                title="Reveals the next letter"
+              >
+                💡 Hint 1 Letter
               </button>
               <button 
                 className="btn-reveal" 
                 onClick={handleRevealAnswer} 
                 disabled={isRevealing}
-                style={{ background: '#ffc107', color: 'black', padding: '10px 18px', borderRadius: '8px', border: 'none', cursor: isRevealing ? 'not-allowed' : 'pointer', opacity: isRevealing ? 0.6 : 1, fontWeight: 'bold' }}
+                style={{ background: '#ffc107', color: 'black', padding: '10px 14px', borderRadius: '8px', border: 'none', cursor: isRevealing ? 'not-allowed' : 'pointer', opacity: isRevealing ? 0.6 : 1, fontWeight: 'bold' }}
               >
                 Reveal Word
               </button>
@@ -364,9 +411,25 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
       {isCompleted && (
         <div className="modal-overlay" style={{ zIndex: 9998 }}>
           <div className="modal-content" style={{ textAlign: 'center' }}>
-            <h2 style={{ color: '#28a745', marginBottom: '1rem' }}>🎉 Puzzle Complete!</h2>
-            <p style={{ color: '#fff', marginBottom: '1.5rem' }}>Amazing job! You solved all the crossword clues.</p>
-            <button className="start-button" onClick={onExit} style={{ width: '100%', marginTop: '0.5rem', padding: '0.8rem' }}>Back to Menu</button>
+            <h2 style={{ color: '#28a745', marginBottom: '0.5rem', fontSize: '2rem' }}>🎉 Crossword Solved!</h2>
+            
+            {/* Animated Stars */}
+            <div style={{ fontSize: '3rem', margin: '1rem 0', letterSpacing: '8px' }}>
+              {'⭐'.repeat(calculateStars())}
+              <span style={{ opacity: 0.2 }}>{'⭐'.repeat(3 - calculateStars())}</span>
+            </div>
+            
+            <p style={{ color: '#feca57', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+              {calculateStars() === 3 ? '🏆 Crossword Champion! Perfect 3 Stars!' : calculateStars() === 2 ? '🌟 Super Detective! Well Solved!' : '👍 Great Effort! Keep Practicing!'}
+            </p>
+
+            <p style={{ color: '#ccc', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
+              You solved all {totalClues} clues using {hintsUsed} hint{hintsUsed === 1 ? '' : 's'}.
+            </p>
+
+            <button className="start-button" onClick={onExit} style={{ width: '100%', padding: '0.8rem' }}>
+              Play Another Puzzle 🚀
+            </button>
           </div>
         </div>
       )}
