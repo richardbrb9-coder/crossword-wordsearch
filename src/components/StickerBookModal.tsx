@@ -42,21 +42,21 @@ export const StickerBookModal: React.FC<StickerBookModalProps> = ({ isOpen, onCl
         <div className="sticker-stats-bar">
           <div className="stat-pill">
             <span className="stat-icon">⭐</span>
-            <div>
+            <div className="stat-content">
               <div className="stat-val">{stats.totalStars}</div>
               <div className="stat-lbl">Stars Earned</div>
             </div>
           </div>
           <div className="stat-pill">
             <span className="stat-icon">🧩</span>
-            <div>
+            <div className="stat-content">
               <div className="stat-val">{stats.puzzlesSolved}</div>
               <div className="stat-lbl">Puzzles Solved</div>
             </div>
           </div>
           <div className="stat-pill">
             <span className="stat-icon">🎨</span>
-            <div>
+            <div className="stat-content">
               <div className="stat-val">{unlockedCount} / {totalCount}</div>
               <div className="stat-lbl">Stickers Collected</div>
             </div>
@@ -65,22 +65,25 @@ export const StickerBookModal: React.FC<StickerBookModalProps> = ({ isOpen, onCl
 
         {/* Category Filters */}
         <div className="sticker-filters">
-          {(['all', 'animals', 'space', 'food', 'fantasy', 'sports'] as const).map(themeId => (
+          {[
+            { id: 'all', icon: '🌈', label: 'All' },
+            { id: 'animals', icon: '🦁', label: 'Animals' },
+            { id: 'space', icon: '🚀', label: 'Space' },
+            { id: 'food', icon: '🍕', label: 'Food' },
+            { id: 'fantasy', icon: '🏰', label: 'Fantasy' },
+            { id: 'sports', icon: '⚽', label: 'Sports' },
+          ].map(tab => (
             <button
-              key={themeId}
+              key={tab.id}
               type="button"
-              className={`filter-btn ${selectedTheme === themeId ? 'active' : ''}`}
+              className={`filter-btn ${selectedTheme === tab.id ? 'active' : ''}`}
               onClick={() => {
                 soundService.playTap();
-                setSelectedTheme(themeId);
+                setSelectedTheme(tab.id as any);
               }}
             >
-              {themeId === 'all' && '🌈 All'}
-              {themeId === 'animals' && '🦁 Animals'}
-              {themeId === 'space' && '🚀 Space'}
-              {themeId === 'food' && '🍕 Food'}
-              {themeId === 'fantasy' && '🏰 Fantasy'}
-              {themeId === 'sports' && '⚽ Sports'}
+              <span className="filter-emoji">{tab.icon}</span>
+              <span className="filter-label">{tab.label}</span>
             </button>
           ))}
         </div>

@@ -14,6 +14,10 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+button, input, select, textarea {
+  font-family: var(--font-family);
+}
+
 /* =========================================
    THEME PALETTES
    ========================================= */
@@ -250,6 +254,129 @@ body {
   outline: none;
   border-color: #feca57;
   box-shadow: 0 0 0 3px rgba(254, 202, 87, 0.3);
+}
+
+/* Theme Selection Grid & Buttons */
+.theme-options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.theme-card-btn {
+  background: var(--input-bg);
+  color: var(--text-main);
+  border: 2px solid var(--border-color);
+  border-radius: 14px;
+  padding: 12px 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-family);
+  font-weight: 600;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.theme-card-btn:hover {
+  border-color: #feca57;
+  transform: translateY(-2px);
+  background: rgba(254, 202, 87, 0.12);
+}
+
+.theme-card-btn.selected {
+  background: linear-gradient(135deg, #feca57, #ff6b6b);
+  color: #1a1a2e;
+  border-color: #feca57;
+  font-weight: 700;
+  transform: scale(1.03);
+  box-shadow: 0 6px 18px rgba(254, 202, 87, 0.45);
+}
+
+.theme-card-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.theme-card-label {
+  font-size: 0.95rem;
+  text-align: center;
+  line-height: 1.2;
+  color: inherit;
+}
+
+.theme-desc-text {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: 10px;
+  text-align: center;
+  min-height: 1.3em;
+}
+
+/* Play Mode Grid & Buttons */
+.playmode-options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.playmode-card-btn {
+  background: var(--input-bg);
+  color: var(--text-main);
+  border: 2px solid var(--border-color);
+  border-radius: 14px;
+  padding: 12px 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: var(--font-family);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.playmode-card-btn:hover {
+  border-color: #feca57;
+  transform: translateY(-2px);
+}
+
+.playmode-card-btn.selected-zen {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.18);
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.25);
+  font-weight: 700;
+  transform: scale(1.02);
+}
+
+.playmode-card-btn.selected-timed {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.18);
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.25);
+  font-weight: 700;
+  transform: scale(1.02);
+}
+
+.playmode-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.playmode-title {
+  font-size: 0.95rem;
+  font-weight: inherit;
+  color: var(--text-main);
+}
+
+.playmode-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 .start-game-button {

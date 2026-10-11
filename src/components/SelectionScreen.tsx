@@ -58,46 +58,26 @@ const SelectionScreen: React.FC<SelectionScreenProps> = ({ onStartGame }) => {
       {/* 2. Theme Selection */}
       <div className="form-group">
         <label>Pick a Fun Theme:</label>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', 
-          gap: '10px', 
-          marginTop: '6px' 
-        }}>
+        <div className="theme-options-grid">
           {Object.values(THEMES).map((t) => {
             const isSelected = theme === t.id;
             return (
               <button
                 key={t.id}
                 type="button"
+                className={`theme-card-btn ${isSelected ? 'selected' : ''}`}
                 onClick={() => {
                   soundService.playTap();
                   setTheme(t.id);
                 }}
-                style={{
-                  background: isSelected ? 'linear-gradient(135deg, #feca57, #ff6b6b)' : 'rgba(255, 255, 255, 0.08)',
-                  color: isSelected ? '#1a1a2e' : '#fff',
-                  border: isSelected ? '2px solid #feca57' : '1px solid rgba(255, 255, 255, 0.15)',
-                  borderRadius: '12px',
-                  padding: '10px 8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontWeight: isSelected ? 'bold' : 'normal',
-                  transform: isSelected ? 'scale(1.03)' : 'scale(1)',
-                  boxShadow: isSelected ? '0 4px 15px rgba(254, 202, 87, 0.4)' : 'none',
-                  transition: 'all 0.2s ease',
-                }}
               >
-                <span style={{ fontSize: '1.8rem' }}>{t.icon}</span>
-                <span style={{ fontSize: '0.9rem', textAlign: 'center' }}>{t.name}</span>
+                <span className="theme-card-icon">{t.icon}</span>
+                <span className="theme-card-label">{t.name}</span>
               </button>
             );
           })}
         </div>
-        <p style={{ fontSize: '0.85rem', color: '#aaa', marginTop: '6px', textAlign: 'center' }}>
+        <p className="theme-desc-text">
           {THEMES[theme]?.description}
         </p>
       </div>
@@ -139,51 +119,25 @@ const SelectionScreen: React.FC<SelectionScreenProps> = ({ onStartGame }) => {
       {/* 5. Play Mode (Zen vs Timed Challenge) */}
       <div className="form-group">
         <label>Play Mode:</label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '6px' }}>
+        <div className="playmode-options-grid">
           <button
             type="button"
+            className={`playmode-card-btn ${playMode === 'zen' ? 'selected-zen' : ''}`}
             onClick={() => { soundService.playTap(); setPlayMode('zen'); }}
-            style={{
-              padding: '10px 12px',
-              borderRadius: '12px',
-              border: playMode === 'zen' ? '2px solid #10b981' : '1px solid rgba(255, 255, 255, 0.15)',
-              background: playMode === 'zen' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-              color: 'var(--text-main)',
-              fontWeight: playMode === 'zen' ? 'bold' : 'normal',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '4px',
-              transition: 'all 0.2s ease',
-            }}
           >
-            <span style={{ fontSize: '1.4rem' }}>🧘</span>
-            <span style={{ fontSize: '0.9rem' }}>Relaxed Zen</span>
-            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>No time limit</span>
+            <span className="playmode-icon">🧘</span>
+            <span className="playmode-title">Relaxed Zen</span>
+            <span className="playmode-desc">No time limit</span>
           </button>
 
           <button
             type="button"
+            className={`playmode-card-btn ${playMode === 'timed' ? 'selected-timed' : ''}`}
             onClick={() => { soundService.playTap(); setPlayMode('timed'); }}
-            style={{
-              padding: '10px 12px',
-              borderRadius: '12px',
-              border: playMode === 'timed' ? '2px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.15)',
-              background: playMode === 'timed' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-              color: 'var(--text-main)',
-              fontWeight: playMode === 'timed' ? 'bold' : 'normal',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '4px',
-              transition: 'all 0.2s ease',
-            }}
           >
-            <span style={{ fontSize: '1.4rem' }}>⏱️</span>
-            <span style={{ fontSize: '0.9rem' }}>Speed Challenge</span>
-            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>Track your time!</span>
+            <span className="playmode-icon">⏱️</span>
+            <span className="playmode-title">Speed Challenge</span>
+            <span className="playmode-desc">Track your time!</span>
           </button>
         </div>
       </div>
