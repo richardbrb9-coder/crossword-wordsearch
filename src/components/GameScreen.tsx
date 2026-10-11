@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Puzzle, Clue, Sticker } from '../types/index.ts';
 import confetti from 'canvas-confetti';
 import { soundService } from '../services/soundService';
@@ -38,6 +38,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [unlockedStickers, setUnlockedStickers] = useState<Sticker[]>([]);
   const [isStickerBookModalOpen, setIsStickerBookModalOpen] = useState(false);
+  const solvedCluesRef = useRef<Set<string>>(new Set());
 
   // In-grid active cursor & direction
   const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
@@ -125,13 +126,101 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
     return 1;
   }, [hintsUsed]);
 
-  // Check progress and completion
+  // Helper to get visible letter in any cell
+  const getCellLetter = useCallback((r: number, c: number): string => {
+    const cell = gridData[r]?.[c];
+    if (!cell || cell.isBlocked) return '';
+
+    // Show letter typed in grid
+    const typed = userGridLetters[`${r}-${c}`];
+    if (typed) return typed;
+
+    // Fallback: If word is solved, show correct letter
+    if (cell.acrossClue && userAnswers[cell.acrossClue.id]) return cell.correctLetter ?? '';
+    if (cell.downClue && userAnswers[cell.downClue.id]) return cell.correctLetter ?? '';
+
+    return '';
+  }, [gridData, userAnswers, userGridLetters]);
+
+  // Comprehensive progress and completion detector:
+  // Automatically scans all clues and all playable cells whenever grid letters change.
   useEffect(() => {
-    const correctCount = Object.keys(userAnswers).length;
-    const currentProgress = totalClues > 0 ? Math.round((correctCount / totalClues) * 100) : 0;
+    if (gridData.length === 0 || !puzzle.clues) return;
+
+    const allClues = [...puzzle.clues.across, ...puzzle.clues.down];
+    if (allClues.length === 0) return;
+
+    // Scan all clues to check which are completely and correctly spelled
+    const newSolvedClues: Record<string, string> = {};
+
+    allClues.forEach(clue => {
+      const word = clue.answer.trim().toUpperCase();
+      const startR = clue.row ?? 0;
+      const startC = clue.col ?? 0;
+      let isClueCorrect = true;
+
+      for (let i = 0; i < clue.length; i++) {
+        const r = clue.direction === 'down' ? startR + i : startR;
+        const c = clue.direction === 'across' ? startC + i : startC;
+        const key = `${r}-${c}`;
+        const letter = (userGridLetters[key] || '').trim().toUpperCase();
+        if (letter !== word[i]) {
+          isClueCorrect = false;
+          break;
+        }
+      }
+
+      if (isClueCorrect) {
+        newSolvedClues[clue.id] = word;
+      }
+    });
+
+    // Sound effect: chime when any clue is newly completed
+    const prevSolved = solvedCluesRef.current;
+    const hasNewlySolved = Object.keys(newSolvedClues).some(id => !prevSolved.has(id));
+    if (hasNewlySolved && prevSolved.size > 0) {
+      soundService.playSuccess();
+    }
+    solvedCluesRef.current = new Set(Object.keys(newSolvedClues));
+
+    // Calculate playable cell correctness
+    let totalPlayableCells = 0;
+    let correctPlayableCells = 0;
+
+    gridData.forEach(row => {
+      row.forEach(cell => {
+        if (!cell.isBlocked && cell.correctLetter) {
+          totalPlayableCells++;
+          const key = `${cell.row}-${cell.col}`;
+          const currentLetter = (userGridLetters[key] || '').trim().toUpperCase();
+          if (currentLetter === cell.correctLetter.trim().toUpperCase()) {
+            correctPlayableCells++;
+          }
+        }
+      });
+    });
+
+    // Update userAnswers state (bail out if unchanged to prevent re-render cycles)
+    setUserAnswers(prev => {
+      const prevKeys = Object.keys(prev);
+      const newKeys = Object.keys(newSolvedClues);
+      if (prevKeys.length === newKeys.length && prevKeys.every(k => prev[k] === newSolvedClues[k])) {
+        return prev;
+      }
+      return newSolvedClues;
+    });
+
+    // Calculate progress percentage
+    const clueRatio = allClues.length > 0 ? Object.keys(newSolvedClues).length / allClues.length : 0;
+    const cellRatio = totalPlayableCells > 0 ? correctPlayableCells / totalPlayableCells : 0;
+    const currentProgress = Math.round(Math.max(clueRatio, cellRatio) * 100);
     setProgress(currentProgress);
 
-    if (currentProgress === 100 && !isCompleted && totalClues > 0) {
+    // Completion condition: all clues solved OR all playable cells filled with correct letters
+    const isAllSolved = (Object.keys(newSolvedClues).length >= allClues.length && allClues.length > 0) ||
+                        (totalPlayableCells > 0 && correctPlayableCells === totalPlayableCells);
+
+    if (isAllSolved && !isCompleted) {
       setIsCompleted(true);
       soundService.playFanfare();
       confetti({ particleCount: 200, spread: 90, origin: { y: 0.5 }, zIndex: 9999 });
@@ -142,42 +231,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
         setUnlockedStickers(newStickers);
       }
     }
-  }, [userAnswers, isCompleted, totalClues, calculateStars, puzzle.theme]);
-
-  // Helper to get visible letter in any cell
-  const getCellLetter = useCallback((r: number, c: number): string => {
-    const cell = gridData[r]?.[c];
-    if (!cell || cell.isBlocked) return '';
-
-    // If word is solved, show correct letter
-    if (cell.acrossClue && userAnswers[cell.acrossClue.id]) return cell.correctLetter ?? '';
-    if (cell.downClue && userAnswers[cell.downClue.id]) return cell.correctLetter ?? '';
-
-    // Otherwise show whatever letter is typed in grid
-    return userGridLetters[`${r}-${c}`] ?? '';
-  }, [gridData, userAnswers, userGridLetters]);
-
-  // Check if a clue is fully and correctly filled in the grid
-  const checkClueCompletion = useCallback((clue: Clue, updatedGridLetters: Record<string, string>) => {
-    const word = clue.answer.toUpperCase();
-    const startR = clue.row ?? 0;
-    const startC = clue.col ?? 0;
-    let filled = '';
-
-    for (let i = 0; i < clue.length; i++) {
-      const r = clue.direction === 'down' ? startR + i : startR;
-      const c = clue.direction === 'across' ? startC + i : startC;
-      const key = `${r}-${c}`;
-      filled += (updatedGridLetters[key] || '');
-    }
-
-    if (filled.length === word.length && filled === word) {
-      soundService.playSuccess();
-      setUserAnswers(prev => ({ ...prev, [clue.id]: word }));
-      return true;
-    }
-    return false;
-  }, []);
+  }, [userGridLetters, gridData, puzzle.clues, isCompleted, calculateStars, puzzle.theme]);
 
   // Enter a letter at current activeCell
   const handleEnterLetter = useCallback((letter: string) => {
@@ -189,9 +243,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
     const updated = { ...userGridLetters, [key]: letter.toUpperCase() };
     setUserGridLetters(updated);
 
-    // Check if current word is now solved
-    const solved = checkClueCompletion(activeClue, updated);
-
     // Advance to next cell in current word
     const startR = activeClue.row ?? 0;
     const startC = activeClue.col ?? 0;
@@ -201,7 +252,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
       const nextR = activeClue.direction === 'down' ? row + 1 : row;
       const nextC = activeClue.direction === 'across' ? col + 1 : col;
       setActiveCell({ row: nextR, col: nextC });
-    } else if (solved) {
+    } else {
       // Find next unsolved clue
       const allClues = [...puzzle.clues.across, ...puzzle.clues.down];
       const nextClue = allClues.find(c => !userAnswers[c.id] && c.id !== activeClue.id);
@@ -210,7 +261,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
         setActiveDirection(nextClue.direction as 'across' | 'down');
       }
     }
-  }, [activeCell, activeClue, userGridLetters, checkClueCompletion, puzzle.clues, userAnswers]);
+  }, [activeCell, activeClue, userGridLetters, puzzle.clues, userAnswers]);
 
   // Backspace handler
   const handleBackspace = useCallback(() => {
@@ -279,12 +330,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
         setActiveCell({ row: r, col: c });
         setHintsUsed(prev => prev + 1);
         soundService.playReveal();
-
-        checkClueCompletion(activeClue, updated);
         return;
       }
     }
-  }, [activeClue, userGridLetters, checkClueCompletion]);
+  }, [activeClue, userGridLetters]);
 
   // Physical Keyboard listener
   useEffect(() => {
@@ -365,11 +414,22 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
 
   const handleModalCheck = () => {
     if (!activeClue) return;
-    if (modalInput.trim().toUpperCase() === activeClue.answer.toUpperCase()) {
+    const word = activeClue.answer.toUpperCase();
+    if (modalInput.trim().toUpperCase() === word) {
       soundService.playSuccess();
       setModalMessage({ text: '✓ Correct! Well done!', type: 'success' });
-      setUserAnswers(prev => ({ ...prev, [activeClue.id]: activeClue.answer.toUpperCase() }));
-      setTimeout(() => closeModal(), 1200);
+
+      // Place all letters of this word onto the grid so intersecting clues benefit
+      const startR = activeClue.row ?? 0;
+      const startC = activeClue.col ?? 0;
+      const updated = { ...userGridLetters };
+      for (let i = 0; i < activeClue.length; i++) {
+        const r = activeClue.direction === 'down' ? startR + i : startR;
+        const c = activeClue.direction === 'across' ? startC + i : startC;
+        updated[`${r}-${c}`] = word[i] ?? '';
+      }
+      setUserGridLetters(updated);
+      setTimeout(() => closeModal(), 1000);
     } else {
       soundService.playError();
       setModalMessage({ text: 'Not quite, try again!', type: 'error' });
