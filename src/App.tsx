@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Puzzle, Difficulty, PuzzleTheme } from '@/types';
+import type { Puzzle, Difficulty, PuzzleTheme, PlayMode, WordEntry } from './types/index.ts';
 import OpeningScreen from './components/OpeningScreen';
 import SelectionScreen from './components/SelectionScreen';
 import GameScreen from './components/GameScreen';
 import WordSearchScreen from './components/WordSearchScreen';
+import { StickerBookModal } from './components/StickerBookModal';
 import './App.css';
 
 import { loadData } from './services/dataLoader.ts';
@@ -16,9 +17,10 @@ function App() {
   const [selectedPuzzle, setSelectedPuzzle] = useState<Puzzle | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isStickerBookOpen, setIsStickerBookOpen] = useState(false);
   
   // State to store the loaded words
-  const [wordBank, setWordBank] = useState<any[]>([]);
+  const [wordBank, setWordBank] = useState<WordEntry[]>([]);
 
   const handleStart = () => {
     setScreen('selection');
@@ -75,6 +77,7 @@ function App() {
       difficulty: Difficulty;
       wordCount: number;
       theme: PuzzleTheme;
+      playMode: PlayMode;
     }
   ): Promise<void> => {
     let activeWords = wordBank;
@@ -128,7 +131,8 @@ function App() {
           `${themeTitle} Crossword`,
           15,
           15,
-          settings.wordCount
+          settings.wordCount,
+          settings.playMode
         );
         puzzle.theme = selectedTheme;
         setSelectedPuzzle(puzzle);
@@ -139,7 +143,8 @@ function App() {
           settings.difficulty,
           `${themeTitle} Word Search`,
           12,
-          settings.wordCount
+          settings.wordCount,
+          settings.playMode
         );
         puzzle.theme = selectedTheme;
         setSelectedPuzzle(puzzle);
@@ -154,8 +159,16 @@ function App() {
 
   return (
     <div className="app" data-theme={colorTheme}>
-      {/* Top Action Controls: Theme & Sound */}
-      <div className="top-controls">
+      {/* Top Action Controls: Stickers, Theme & Sound */}
+      <div className="top-controls no-print">
+        <button 
+          type="button"
+          onClick={() => { soundService.playTap(); setIsStickerBookOpen(true); }}
+          className="control-btn sticker-btn"
+          title="Open My Sticker Album 🏆"
+        >
+          🏆 Stickers
+        </button>
         <button 
           type="button"
           onClick={toggleColorTheme}
@@ -196,6 +209,9 @@ function App() {
       {screen === 'game' && selectedPuzzle && selectedPuzzle.type === 'wordsearch' && (
         <WordSearchScreen puzzle={selectedPuzzle} onExit={handleStart} />
       )}
+
+      {/* Global Sticker Album Modal */}
+      <StickerBookModal isOpen={isStickerBookOpen} onClose={() => setIsStickerBookOpen(false)} />
     </div>
   );
 }

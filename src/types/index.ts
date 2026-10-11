@@ -2,6 +2,7 @@
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type PuzzleTheme = 'all' | 'animals' | 'space' | 'food' | 'fantasy' | 'sports';
+export type PlayMode = 'zen' | 'timed';
 
 export type WordEntry = {
   word: string;
@@ -10,6 +11,7 @@ export type WordEntry = {
   synonyms: string[];
   antonyms: string[];
   length: number;
+  emoji?: string;
 };
 
 export type Clue = {
@@ -22,6 +24,7 @@ export type Clue = {
   row?: number;
   col?: number;
   difficulty?: Difficulty;
+  emoji?: string;
 };
 
 export type Puzzle = {
@@ -43,6 +46,7 @@ export type Puzzle = {
   };
   theme?: string;
   rawGrid?: string[][];
+  playMode?: PlayMode;
 };
 
 export type GridPosition = {
@@ -51,3 +55,17 @@ export type GridPosition = {
 };
 
 export type CellValue = string | null;
+
+export type Sticker = {
+  id: string;
+  title: string;
+  emoji: string;
+  theme: PuzzleTheme | 'general';
+  description: string;
+};
+
+export type UserStats = {
+  totalStars: number;
+  puzzlesSolved: number;
+  unlockedStickers: string[];
+};

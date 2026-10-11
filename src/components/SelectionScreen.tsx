@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Difficulty, PuzzleTheme } from '@/types';
+import type { Difficulty, PuzzleTheme, PlayMode } from '../types/index.ts';
 import { soundService } from '../services/soundService';
 import { THEMES } from '../data/themes';
 
@@ -7,8 +7,9 @@ interface SelectionScreenProps {
   onStartGame: (settings: { 
     puzzleType: 'crossword' | 'wordsearch'; 
     difficulty: Difficulty; 
-    wordCount: number;
+    wordCount: number; 
     theme: PuzzleTheme;
+    playMode: PlayMode;
   }) => void;
 }
 
@@ -17,6 +18,7 @@ const SelectionScreen: React.FC<SelectionScreenProps> = ({ onStartGame }) => {
   const [theme, setTheme] = useState<PuzzleTheme>('animals');
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [wordCount, setWordCount] = useState(10);
+  const [playMode, setPlayMode] = useState<PlayMode>('zen');
 
   const validate = () => {
     if (!puzzleType || !difficulty || wordCount < 10 || wordCount > 16) {
@@ -29,7 +31,7 @@ const SelectionScreen: React.FC<SelectionScreenProps> = ({ onStartGame }) => {
   const handleStartGame = () => {
     soundService.playTap();
     if (validate()) {
-      onStartGame({ puzzleType, difficulty, wordCount, theme });
+      onStartGame({ puzzleType, difficulty, wordCount, theme, playMode });
     }
   };
 
@@ -132,6 +134,58 @@ const SelectionScreen: React.FC<SelectionScreenProps> = ({ onStartGame }) => {
           <option value="14">14 Words (Standard)</option>
           <option value="16">16 Words (Mega Puzzle)</option>
         </select>
+      </div>
+
+      {/* 5. Play Mode (Zen vs Timed Challenge) */}
+      <div className="form-group">
+        <label>Play Mode:</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '6px' }}>
+          <button
+            type="button"
+            onClick={() => { soundService.playTap(); setPlayMode('zen'); }}
+            style={{
+              padding: '10px 12px',
+              borderRadius: '12px',
+              border: playMode === 'zen' ? '2px solid #10b981' : '1px solid rgba(255, 255, 255, 0.15)',
+              background: playMode === 'zen' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+              color: 'var(--text-main)',
+              fontWeight: playMode === 'zen' ? 'bold' : 'normal',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span style={{ fontSize: '1.4rem' }}>🧘</span>
+            <span style={{ fontSize: '0.9rem' }}>Relaxed Zen</span>
+            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>No time limit</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { soundService.playTap(); setPlayMode('timed'); }}
+            style={{
+              padding: '10px 12px',
+              borderRadius: '12px',
+              border: playMode === 'timed' ? '2px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.15)',
+              background: playMode === 'timed' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+              color: 'var(--text-main)',
+              fontWeight: playMode === 'timed' ? 'bold' : 'normal',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span style={{ fontSize: '1.4rem' }}>⏱️</span>
+            <span style={{ fontSize: '0.9rem' }}>Speed Challenge</span>
+            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>Track your time!</span>
+          </button>
+        </div>
       </div>
 
       <button onClick={handleStartGame} className="start-game-button">

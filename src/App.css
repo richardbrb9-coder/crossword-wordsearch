@@ -86,14 +86,34 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+.control-btn.sticker-btn {
+  width: auto;
+  border-radius: 22px;
+  padding: 0 16px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  display: inline-flex;
+  gap: 6px;
+  background: linear-gradient(135deg, #feca57, #ff9f43);
+  color: #1a1a2e;
+  border: 2px solid #feca57;
+  box-shadow: 0 4px 14px rgba(254, 202, 87, 0.45);
+}
+
 .app[data-theme="bright"] .control-btn {
   background: rgba(255, 255, 255, 0.85);
   border-color: #cbd5e1;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
+.app[data-theme="bright"] .control-btn.sticker-btn {
+  background: linear-gradient(135deg, #feca57, #ff9f43);
+  color: #1a1a2e;
+  border-color: #feca57;
+}
+
 .control-btn:hover {
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 /* =========================================
@@ -260,4 +280,135 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 1.5rem;
+}
+
+/* =========================================
+   PRINT WORKSHEET STYLES
+   ========================================= */
+.print-header {
+  display: none;
+}
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .app {
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .no-print,
+  .top-controls,
+  .active-clue-banner,
+  .keyboard-container,
+  .virtual-keyboard,
+  .modal-overlay,
+  .acb-actions,
+  .game-header,
+  .selection-screen,
+  .opening-screen {
+    display: none !important;
+  }
+
+  .print-header {
+    display: block !important;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #000;
+  }
+
+  .print-header h1 {
+    font-size: 22pt;
+    margin: 0 0 6px 0;
+    color: #000;
+  }
+
+  .print-header .student-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13pt;
+    margin-top: 14px;
+    color: #000;
+  }
+
+  .crossword-container {
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 auto 24px auto !important;
+  }
+
+  .crossword-grid {
+    border: none !important;
+  }
+
+  .crossword-cell:not(.blocked) {
+    background: white !important;
+    border: 2px solid #000 !important;
+    box-shadow: none !important;
+  }
+
+  /* Blank cells for solving on paper */
+  .crossword-cell .cell-content {
+    display: none !important;
+  }
+
+  .crossword-cell .cell-number {
+    color: #000 !important;
+    font-size: 9pt !important;
+    font-weight: bold !important;
+  }
+
+  .clues-section {
+    page-break-inside: avoid;
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    color: #000 !important;
+  }
+
+  .clue-column h3 {
+    color: #000 !important;
+    border-bottom: 1px solid #000 !important;
+    font-size: 14pt !important;
+  }
+
+  .clue-list li {
+    color: #000 !important;
+    font-size: 10.5pt !important;
+    margin-bottom: 6px !important;
+  }
+
+  /* Word Search Print */
+  .ws-grid {
+    background: white !important;
+    border: 2px solid #000 !important;
+    box-shadow: none !important;
+    margin: 0 auto 20px auto !important;
+  }
+
+  .ws-cell {
+    background: white !important;
+    border: 1px solid #999 !important;
+    color: #000 !important;
+    box-shadow: none !important;
+  }
+
+  .ws-wordbank {
+    background: white !important;
+    border: 1px solid #000 !important;
+    box-shadow: none !important;
+  }
+
+  .ws-wordbank h3,
+  .ws-wordbank li {
+    color: #000 !important;
+  }
 }

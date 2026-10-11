@@ -3,7 +3,8 @@
  * Generates crossword and word search puzzles from JSON word data.
  */
 
-import type { Puzzle, Clue, Difficulty, WordEntry } from '../types/index.ts';
+import type { Puzzle, Clue, Difficulty, WordEntry, PlayMode } from '../types/index.ts';
+import { getWordEmoji } from '../data/emojis.ts';
 
 /**
  * Difficulty configurations for word length
@@ -77,6 +78,8 @@ export function wordEntryToClue(
   } else if (entry.antonyms && entry.antonyms.length > 0 && entry.antonyms[0]) {
     clueText = `Opposite of "${entry.antonyms[0]}".`;
   }
+
+  const emoji = entry.emoji || getWordEmoji(entry.word);
   
   return {
     id: `${direction}-${number}`,
@@ -86,7 +89,8 @@ export function wordEntryToClue(
     number,
     length: entry.word.length,
     row,
-    col
+    col,
+    emoji,
   };
 }
 
@@ -96,7 +100,8 @@ export function generateCrossword(
   title: string,
   width: number = 15,
   height: number = 15,
-  wordCount: number = 10
+  wordCount: number = 10,
+  playMode: PlayMode = 'zen'
 ): Puzzle {
   const filteredWords = extractWords(words, difficulty);
   
@@ -309,6 +314,7 @@ export function generateCrossword(
       down: finalClues.filter(c => c.direction === 'down').map(c => c.answer),
     },
     theme: 'newspaper',
+    playMode,
   };
 }
 
@@ -320,7 +326,8 @@ export function generateWordSearch(
   difficulty: Difficulty,
   title: string,
   size: number = 12,
-  wordCount: number = 10
+  wordCount: number = 10,
+  playMode: PlayMode = 'zen'
 ): Puzzle {
   const filteredWords = extractWords(words, difficulty);
   
@@ -390,6 +397,8 @@ export function generateWordSearch(
           ? entry.definitions[0].replace(/\.+$/, '').trim() + '.'
           : `Find the word: ${word}`;
 
+        const emoji = entry.emoji || getWordEmoji(word);
+
         placedClues.push({
           id: `ws-word-${placedClues.length}`,
           answer: word,
@@ -398,7 +407,8 @@ export function generateWordSearch(
           number: placedClues.length + 1,
           length: word.length,
           row: startR,
-          col: startC
+          col: startC,
+          emoji,
         });
         placed = true;
       }
@@ -432,7 +442,8 @@ export function generateWordSearch(
       across: placedClues.map(c => c.answer),
       down: [],
     },
-    theme: 'newspaper',
+    theme: 'wordsearch',
     rawGrid: grid,
+    playMode,
   };
 }

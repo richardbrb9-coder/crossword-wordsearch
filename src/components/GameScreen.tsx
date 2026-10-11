@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Puzzle, Clue } from '@/types';
+import type { Puzzle, Clue, Sticker } from '../types/index.ts';
 import confetti from 'canvas-confetti';
 import { soundService } from '../services/soundService';
 import { speechService } from '../services/speechService';
+import { stickerService } from '../services/stickerService';
+import { StickerBookModal } from './StickerBookModal';
 import './GameScreen.css';
 
 interface GameScreenProps {
@@ -33,6 +35,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
   const [gridData, setGridData] = useState<GridCell[][]>([]);
   const [isCompleted, setIsCompleted] = useState(false);
   const [hintsUsed, setHintsUsed] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [unlockedStickers, setUnlockedStickers] = useState<Sticker[]>([]);
+  const [isStickerBookModalOpen, setIsStickerBookModalOpen] = useState(false);
 
   // In-grid active cursor & direction
   const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
@@ -42,6 +47,21 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalInput, setModalInput] = useState('');
   const [modalMessage, setModalMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // Friendly stopwatch timer for timed mode
+  useEffect(() => {
+    if (isCompleted || puzzle.playMode !== 'timed') return;
+    const interval = setInterval(() => {
+      setElapsedSeconds(s => s + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isCompleted, puzzle.playMode]);
+
+  const formatTime = (secs: number): string => {
+    const mins = Math.floor(secs / 60);
+    const remSecs = secs % 60;
+    return `${mins.toString().padStart(2, '0')}:${remSecs.toString().padStart(2, '0')}`;
+  };
 
   // Build grid data from puzzle definition
   useEffect(() => {
@@ -99,6 +119,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
     return cell.acrossClue || cell.downClue || null;
   }, [activeCell, activeDirection, gridData]);
 
+  const calculateStars = useCallback((): number => {
+    if (hintsUsed === 0) return 3;
+    if (hintsUsed <= 2) return 2;
+    return 1;
+  }, [hintsUsed]);
+
   // Check progress and completion
   useEffect(() => {
     const correctCount = Object.keys(userAnswers).length;
@@ -109,8 +135,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
       setIsCompleted(true);
       soundService.playFanfare();
       confetti({ particleCount: 200, spread: 90, origin: { y: 0.5 }, zIndex: 9999 });
+
+      const stars = calculateStars();
+      const { newStickers } = stickerService.recordPuzzleWin((puzzle.theme as any) || 'all', stars);
+      if (newStickers.length > 0) {
+        setUnlockedStickers(newStickers);
+      }
     }
-  }, [userAnswers, isCompleted, totalClues]);
+  }, [userAnswers, isCompleted, totalClues, calculateStars, puzzle.theme]);
 
   // Helper to get visible letter in any cell
   const getCellLetter = useCallback((r: number, c: number): string => {
@@ -345,11 +377,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
     }
   };
 
-  const calculateStars = (): number => {
-    if (hintsUsed === 0) return 3;
-    if (hintsUsed <= 2) return 2;
-    return 1;
-  };
 
   // Check if a cell is in active clue
   const isCellInActiveClue = (r: number, c: number): boolean => {
@@ -364,7 +391,17 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
 
   return (
     <div className="game-screen">
-      <div className="game-header" style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', alignItems: 'center' }}>
+      {/* Printable Worksheet Header (Only visible when printed) */}
+      <div className="print-header">
+        <h1>{puzzle.title}</h1>
+        <p style={{ margin: '4px 0', fontSize: '11pt' }}>Fill in the crossword puzzle using the clues below.</p>
+        <div className="student-info">
+          <span>Name: _____________________________________</span>
+          <span>Date: ____________________</span>
+        </div>
+      </div>
+
+      <div className="game-header" style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
         <button 
           onClick={onExit} 
           style={{ background: '#ff4444', color: 'white', padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
@@ -372,14 +409,50 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
           Back to Menu
         </button>
 
+        {/* Timer or Zen Mode Badge */}
+        <div style={{
+          background: puzzle.playMode === 'timed' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+          border: `1px solid ${puzzle.playMode === 'timed' ? '#f59e0b' : '#10b981'}`,
+          borderRadius: '20px',
+          padding: '6px 14px',
+          fontWeight: 'bold',
+          fontSize: '0.95rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px'
+        }}>
+          {puzzle.playMode === 'timed' ? `⏱️ ${formatTime(elapsedSeconds)}` : '🧘 Relaxed Mode'}
+        </div>
+
         {progress > 0 && (
-          <div className="progress-indicator" style={{ flexGrow: 1, margin: '0 20px' }}>
+          <div className="progress-indicator" style={{ flexGrow: 1, margin: '0 12px', minWidth: '180px' }}>
             <div className="progress-bar">
               <div className="progress-fill" style={{ width: `${progress}%` }} />
             </div>
             <span className="progress-text">{progress}% solved ({Object.keys(userAnswers).length}/{totalClues})</span>
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={() => window.print()}
+          style={{
+            background: 'rgba(255, 255, 255, 0.12)',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-main)',
+            padding: '8px 14px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '0.9rem'
+          }}
+          title="Print this puzzle as a worksheet or save as PDF"
+        >
+          🖨️ Print
+        </button>
       </div>
 
       {/* Pinned Active Clue Banner Above Grid */}
@@ -426,6 +499,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
           </div>
 
           <p className="acb-question">
+            {activeClue.emoji && puzzle.difficulty === 'easy' && (
+              <span style={{ fontSize: '1.6rem', marginRight: '8px', verticalAlign: 'middle' }}>
+                {activeClue.emoji}
+              </span>
+            )}
             {activeClue.question}
           </p>
         </div>
@@ -516,7 +594,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
                       onClick={() => handleSelectClue(clue)} 
                       style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                     >
-                      <span>{clue.number}. {clue.question}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {clue.emoji && puzzle.difficulty === 'easy' && (
+                          <span style={{ fontSize: '1.2rem' }}>{clue.emoji}</span>
+                        )}
+                        <span>{clue.number}. {clue.question}</span>
+                      </span>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -547,7 +630,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
                       onClick={() => handleSelectClue(clue)} 
                       style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                     >
-                      <span>{clue.number}. {clue.question}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {clue.emoji && puzzle.difficulty === 'easy' && (
+                          <span style={{ fontSize: '1.2rem' }}>{clue.emoji}</span>
+                        )}
+                        <span>{clue.number}. {clue.question}</span>
+                      </span>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -574,6 +662,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h3>{activeClue.direction === 'across' ? 'Across' : 'Down'} {activeClue.number} ({activeClue.length} letters)</h3>
             
+            {activeClue.emoji && puzzle.difficulty === 'easy' && (
+              <div style={{ fontSize: '3.2rem', textAlign: 'center', margin: '6px 0' }}>
+                {activeClue.emoji}
+              </div>
+            )}
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '1rem' }}>
               <p style={{ margin: 0, fontSize: '1.15rem', textAlign: 'center' }}>
                 {activeClue.question}
@@ -638,16 +732,60 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
               {calculateStars() === 3 ? '🏆 Crossword Master! 3 Stars!' : calculateStars() === 2 ? '🌟 Super Detective! 2 Stars!' : '👍 Great Effort! 1 Star!'}
             </p>
 
-            <p style={{ color: '#ccc', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
+            {puzzle.playMode === 'timed' && (
+              <p style={{ color: '#48dbfb', fontWeight: 'bold', margin: '4px 0', fontSize: '1.05rem' }}>
+                ⏱️ Finished in {formatTime(elapsedSeconds)}! ⚡ Speed Bonus!
+              </p>
+            )}
+
+            <p style={{ color: '#ccc', marginBottom: '1rem', fontSize: '0.95rem' }}>
               You solved all {totalClues} clues using {hintsUsed} hint{hintsUsed === 1 ? '' : 's'}.
             </p>
 
-            <button className="start-button" onClick={onExit} style={{ width: '100%', padding: '0.8rem' }}>
-              Play Another Puzzle 🚀
-            </button>
+            {/* Newly Unlocked Sticker Notification */}
+            {unlockedStickers.length > 0 && (
+              <div style={{ 
+                background: 'linear-gradient(135deg, rgba(254, 202, 87, 0.25), rgba(255, 107, 107, 0.25))', 
+                border: '2px solid #feca57', 
+                borderRadius: '16px', 
+                padding: '12px', 
+                margin: '12px 0' 
+              }}>
+                <div style={{ fontSize: '0.85rem', color: '#feca57', fontWeight: 'bold' }}>🎉 NEW STICKER UNLOCKED!</div>
+                <div style={{ fontSize: '2.5rem', margin: '4px 0' }}>{unlockedStickers[0]?.emoji}</div>
+                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--text-main)' }}>{unlockedStickers[0]?.title}</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{unlockedStickers[0]?.description}</div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '1rem' }}>
+              <button 
+                type="button" 
+                onClick={() => setIsStickerBookModalOpen(true)} 
+                style={{ 
+                  background: 'linear-gradient(135deg, #feca57, #ff9f43)', 
+                  color: '#1a1a2e', 
+                  border: 'none', 
+                  padding: '10px', 
+                  borderRadius: '12px', 
+                  fontWeight: 'bold', 
+                  cursor: 'pointer',
+                  fontSize: '1rem'
+                }}
+              >
+                View Sticker Album 🏆
+              </button>
+
+              <button className="start-button" onClick={onExit} style={{ width: '100%', padding: '0.8rem' }}>
+                Play Another Puzzle 🚀
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* In-Game Sticker Album Modal */}
+      <StickerBookModal isOpen={isStickerBookModalOpen} onClose={() => setIsStickerBookModalOpen(false)} />
     </div>
   );
 };
