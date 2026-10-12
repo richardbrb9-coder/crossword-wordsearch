@@ -463,16 +463,29 @@ button, input, select, textarea {
     color: #000;
   }
 
+  /* Undo the one-screen tablet layout so the worksheet flows onto paper */
+  .game-screen.crossword-screen {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .cw-layout {
+    display: block !important;
+  }
+
   .crossword-container {
     background: white !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
     margin: 0 auto 24px auto !important;
+    overflow: visible !important;
   }
 
   .crossword-grid {
     border: none !important;
+    --cell: 30px !important;
   }
 
   .crossword-cell:not(.blocked) {
@@ -501,13 +514,29 @@ button, input, select, textarea {
     color: #000 !important;
   }
 
-  .clue-column h3 {
+  .cw-side .clues-section {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    overflow: visible !important;
+  }
+
+  .clues-section ul {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .clues-section li button {
+    display: none !important;
+  }
+
+  .clues-section h3 {
     color: #000 !important;
     border-bottom: 1px solid #000 !important;
     font-size: 14pt !important;
   }
 
-  .clue-list li {
+  .clues-section li {
     color: #000 !important;
     font-size: 10.5pt !important;
     margin-bottom: 6px !important;

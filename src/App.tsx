@@ -8,7 +8,7 @@ import { StickerBookModal } from './components/StickerBookModal';
 import './App.css';
 
 import { loadData } from './services/dataLoader.ts';
-import { generateCrossword, generateWordSearch } from './services/puzzleGenerator';
+import { generateCrossword, generateWordSearch, getCrosswordMaxSize } from './services/puzzleGenerator';
 import { soundService } from './services/soundService';
 import { THEMES } from './data/themes';
 
@@ -125,12 +125,13 @@ function App() {
       const themeTitle = themeData ? `${themeData.icon} ${themeData.name}` : '🎯 Kids';
 
       if (settings.puzzleType === 'crossword') {
+        const maxSize = getCrosswordMaxSize(settings.difficulty, settings.wordCount);
         const puzzle = generateCrossword(
           wordsPool,
           settings.difficulty,
           `${themeTitle} Crossword`,
-          15,
-          15,
+          maxSize.width,
+          maxSize.height,
           settings.wordCount,
           settings.playMode
         );

@@ -1,28 +1,84 @@
-/* Container Layouts */
-.crossword-display,
-.crossword-section,
-.crossword-area,
+/* =========================================
+   SCREEN LAYOUT (whole puzzle on one screen)
+   ========================================= */
+
+/* Fixed to the visible screen height: only the clue list scrolls */
+.game-screen.crossword-screen {
+  height: 100vh;
+  height: 100dvh;
+  max-width: 1400px;
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.cw-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  /* Leave room for the fixed sticker/theme/sound buttons in the top-right corner */
+  padding-right: 240px;
+}
+
+.cw-header .cw-progress {
+  flex: 1;
+  min-width: 140px;
+  padding: 0.35rem 1rem;
+}
+
+.cw-header .cw-progress .progress-bar {
+  margin-bottom: 2px;
+}
+
+.cw-header > button:last-child {
+  margin-left: auto;
+}
+
+/* Grid on the left, clue + clue list + keyboard on the right */
+.cw-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(340px, 38%, 480px);
+  gap: 16px;
+}
+
 .crossword-container {
   background: var(--bg-card);
   border-radius: 20px;
-  padding: 1.5rem;
-  margin: 1.5rem 0;
+  padding: 10px;
   border: 1px solid var(--border-color);
   box-shadow: var(--card-shadow);
-  transition: all 0.3s ease;
+  min-width: 0;
+  min-height: 0;
+  /* The grid centers itself with margin: auto, which (unlike justify-content)
+     keeps it scrollable if a very small screen forces it to overflow */
+  display: flex;
+  overflow: auto;
+}
+
+.cw-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
 }
 
 /* =========================================
-   ACTIVE CLUE BANNER (ABOVE GRID)
+   ACTIVE CLUE BANNER (TOP OF CLUE PANEL)
    ========================================= */
 
 .active-clue-banner {
   background: var(--bg-card);
   border: 2px solid #feca57;
   border-radius: 16px;
-  padding: 1rem 1.25rem;
-  margin: 0 auto 1.5rem auto;
-  max-width: 650px;
+  padding: 0.75rem 1rem;
+  flex: none;
   box-shadow: 0 6px 20px rgba(254, 202, 87, 0.25);
   display: flex;
   flex-direction: column;
@@ -89,7 +145,7 @@
 }
 
 .acb-question {
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   font-weight: 600;
   color: var(--text-main);
   line-height: 1.4;
@@ -100,11 +156,12 @@
    CROSSWORD GRID
    ========================================= */
 
+/* --cols and --cell are set by GameScreen; gap/padding must match GRID_GAP/GRID_PADDING there */
 .crossword-grid {
   display: grid;
-  width: 100%;
-  max-width: 520px;
-  margin: 0 auto; 
+  grid-template-columns: repeat(var(--cols, 10), var(--cell, 40px));
+  grid-auto-rows: var(--cell, 40px);
+  margin: auto;
   background-color: transparent; 
   gap: 3px;
   border: none;
@@ -112,11 +169,12 @@
   padding: 6px; 
   overflow: visible;
   box-shadow: none;
+  touch-action: manipulation; /* no double-tap zoom when tapping a cell twice */
 }
 
 .crossword-cell {
   width: 100%;
-  aspect-ratio: 1 / 1; 
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -159,9 +217,11 @@
   transform: scale(1.04);
 }
 
-.crossword-cell:hover:not(.blocked):not(.active-cursor) {
-  filter: brightness(0.96);
-  transform: scale(1.02);
+@media (hover: hover) {
+  .crossword-cell:hover:not(.blocked):not(.active-cursor) {
+    filter: brightness(0.96);
+    transform: scale(1.02);
+  }
 }
 
 /* Cell number */
@@ -169,7 +229,7 @@
   position: absolute;
   top: 2px;
   left: 3px;
-  font-size: 0.7rem;
+  font-size: max(9px, calc(var(--cell, 40px) * 0.24));
   color: #475569;
   font-weight: 700;
   line-height: 1;
@@ -182,12 +242,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.35rem;
+  font-size: calc(var(--cell, 40px) * 0.55);
   font-weight: 700;
   text-transform: uppercase;
   color: var(--cell-text);
   line-height: 1;
-  padding-top: 4px;
+  padding-top: calc(var(--cell, 40px) * 0.08);
 }
 
 .crossword-cell.solved .cell-content {
@@ -199,8 +259,10 @@
    ========================================= */
 
 .virtual-keyboard {
+  flex: none;
+  width: 100%;
   max-width: 520px;
-  margin: 1.5rem auto 0 auto;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -217,8 +279,8 @@
 
 .vk-key {
   flex: 1;
-  max-width: 44px;
-  height: 48px;
+  max-width: 48px;
+  height: clamp(40px, 6.5vh, 54px);
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-bottom: 3px solid rgba(0, 0, 0, 0.2);
@@ -242,10 +304,13 @@
   border-bottom: 3px solid #94a3b8;
 }
 
-.vk-key:hover {
-  background: #feca57;
-  color: #1a1a2e;
-  transform: translateY(-2px);
+/* Hover only on mouse devices, so tapped keys don't stay highlighted on tablets */
+@media (hover: hover) {
+  .vk-key:hover {
+    background: #feca57;
+    color: #1a1a2e;
+    transform: translateY(-2px);
+  }
 }
 
 .vk-key:active {
@@ -315,6 +380,34 @@
   color: #16a34a !important;
   text-decoration: line-through;
   opacity: 0.7;
+}
+
+.cw-side .clues-section {
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 0.25rem 0.75rem 0.5rem;
+}
+
+.cw-side .clues-section h3 {
+  font-size: 1.15rem;
+  margin: 0.5rem 0;
+  padding-bottom: 0.3rem;
+}
+
+.cw-side .clues-section ul {
+  max-height: none;
+  overflow: visible;
+}
+
+.cw-side .clues-section li {
+  padding: 0.5rem 0.6rem;
 }
 
 /* =========================================
@@ -415,21 +508,38 @@
   color: var(--text-main);
 }
 
-@media (max-width: 768px) {
-  .clues-section {
-    grid-template-columns: 1fr;
+/* Portrait tablets: grid on top, clue panel underneath */
+@media (orientation: portrait) {
+  .cw-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
   }
-  .crossword-grid {
-    max-width: 100%;
+  .cw-side .clues-section {
+    flex: none;
+    max-height: 22vh;
   }
-  .cell-content {
-    font-size: 1.1rem;
+}
+
+/* Phones and short screens: too small for one screen, so let the page scroll */
+@media (max-height: 560px), (max-width: 600px) {
+  .game-screen.crossword-screen {
+    height: auto;
+    overflow: visible;
   }
-  .cell-number {
-    font-size: 0.6rem;
+  .cw-header {
+    flex-wrap: wrap;
+    padding-right: 0;
+    padding-top: 52px;
   }
-  .vk-key {
-    height: 42px;
-    font-size: 1.05rem;
+  .cw-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+  .crossword-container {
+    height: min(90vh, 100vw);
+  }
+  .cw-side .clues-section {
+    flex: none;
+    max-height: 40vh;
   }
 }
