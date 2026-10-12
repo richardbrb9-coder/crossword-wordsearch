@@ -32,6 +32,8 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef<{ row: number; col: number } | null>(null);
   const lastHoveredCellRef = useRef<{ row: number; col: number } | null>(null);
+  // Letter tapped earlier, waiting for a tap on the word's other end
+  const tapStartRef = useRef<{ row: number; col: number } | null>(null);
 
   // Friendly stopwatch timer for timed mode
   useEffect(() => {
@@ -144,9 +146,12 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
     return line;
   };
 
-  // Pointer Down - start drag or initial tap
+  // Pointer Down - start drag or tap (decided on pointer up)
   const handlePointerDown = (row: number, col: number, e: React.PointerEvent) => {
     e.preventDefault();
+    // A single letter already selected may be the start of a tap-tap selection
+    tapStartRef.current = selectedCells.length === 1 ? selectedCells[0] ?? null : null;
+
     isDraggingRef.current = true;
     dragStartRef.current = { row, col };
     lastHoveredCellRef.current = { row, col };
@@ -179,10 +184,13 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
     setSelectedCells(line);
   };
 
-  // Pointer Up - check match
+  // Pointer Up - check a dragged line, or finish a tap-tap selection
   const handlePointerUp = () => {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
+    const tapStart = tapStartRef.current;
+    const tapEnd = dragStartRef.current;
+    tapStartRef.current = null;
 
     if (selectedCells.length > 1) {
       const matched = checkMatch(selectedCells);
@@ -190,21 +198,13 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
         // Clear non-matching dragged selection
         setSelectedCells([]);
       }
-    }
-  };
-
-  // Fallback / alternate click handler for tap-start & tap-end
-  const handleCellClick = (row: number, col: number) => {
-    if (isDraggingRef.current) return;
-
-    // If a single cell is currently selected and player clicks another cell
-    if (selectedCells.length === 1 && (selectedCells[0]?.row !== row || selectedCells[0]?.col !== col)) {
-      const startCell = selectedCells[0]!;
-      const line = computeLine(startCell, { row, col });
-      if (checkMatch(line)) {
-        return;
+    } else if (tapStart && tapEnd && (tapStart.row !== tapEnd.row || tapStart.col !== tapEnd.col)) {
+      // Second tap: try the line from the first tapped letter to this one
+      const line = computeLine(tapStart, tapEnd);
+      if (!checkMatch(line)) {
+        // Show the attempted line; the next tap starts a new selection
+        setSelectedCells(line);
       }
-      setSelectedCells(line);
     }
   };
 
@@ -326,7 +326,7 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
       </div>
 
       <div style={{ margin: '8px 0 14px', fontSize: '1.25rem', color: activeColor, minHeight: '32px', fontWeight: 'bold', letterSpacing: '2px', textAlign: 'center' }}>
-        {currentSpelling ? `Spelling: ${currentSpelling}` : '👆 Drag or tap letters to find hidden words!'}
+        {currentSpelling ? `Spelling: ${currentSpelling}` : '👆 Drag across a word, or tap its first and last letters!'}
       </div>
 
       <div className="game-content wordsearch-content">
@@ -346,7 +346,6 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
                 className={`ws-cell ${isHint ? 'hint-active' : ''}`} 
                 style={getCellStyle(rowIndex, colIndex)} 
                 onPointerDown={(e) => handlePointerDown(rowIndex, colIndex, e)}
-                onClick={() => handleCellClick(rowIndex, colIndex)}
               >
                 {letter}
               </button>
