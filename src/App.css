@@ -410,6 +410,23 @@ button, input, select, textarea {
 }
 
 /* =========================================
+   LOADING SCREEN
+   ========================================= */
+.loading-spinner {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  border: 6px solid var(--border-color);
+  border-top-color: #feca57;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* =========================================
    PRINT WORKSHEET STYLES
    ========================================= */
 .print-header {
@@ -542,8 +559,41 @@ button, input, select, textarea {
     margin-bottom: 6px !important;
   }
 
-  /* Word Search Print */
+  /* Word Search Print: undo the one-screen layout */
+  .game-screen.wordsearch-screen {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .ws-spelling {
+    display: none !important;
+  }
+
+  .wordsearch-content {
+    display: block !important;
+  }
+
+  .ws-board {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .ws-cell {
+    font-size: 14pt !important;
+  }
+
+  .ws-wordbank {
+    width: 100% !important;
+  }
+
+  .ws-wordbank ul {
+    columns: 3;
+  }
+
   .ws-grid {
+    width: 100% !important;
+    max-width: 560px;
     background: white !important;
     border: 2px solid #000 !important;
     box-shadow: none !important;

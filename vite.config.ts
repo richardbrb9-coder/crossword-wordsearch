@@ -8,7 +8,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'data/*': path.resolve(__dirname, './data/*'),
     },
   },
   server: {
@@ -16,14 +15,9 @@ export default defineConfig({
     port: 5200,
     strictPort: true,
   },
-  // Include data folder in the bundle
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
     emptyOutDir: true,
-  },
-  // Include data folder in Vite's watch
-  watch: {
-    included: ['**/*.json'],
   },
 })

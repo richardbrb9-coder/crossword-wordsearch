@@ -471,6 +471,35 @@
   box-shadow: 0 0 20px rgba(254, 202, 87, 0.4);
 }
 
+/* "Correct!" / "Not quite" feedback in the expanded clue popup */
+.result-message {
+  margin-top: 1rem;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  border: 2px solid transparent;
+}
+
+.result-message.success {
+  background: rgba(22, 163, 74, 0.15);
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+.result-message.error {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: #f59e0b;
+  color: #d97706;
+}
+
+.result-message.info {
+  background: rgba(72, 219, 251, 0.15);
+  border-color: #0abde3;
+  color: var(--text-main);
+}
+
 .progress-indicator {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 12px;

@@ -225,7 +225,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
     // Sound effect: chime when any clue is newly completed
     const prevSolved = solvedCluesRef.current;
     const hasNewlySolved = Object.keys(newSolvedClues).some(id => !prevSolved.has(id));
-    if (hasNewlySolved && prevSolved.size > 0) {
+    if (hasNewlySolved) {
       soundService.playSuccess();
     }
     solvedCluesRef.current = new Set(Object.keys(newSolvedClues));
@@ -386,6 +386,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isModalOpen || isCompleted) return;
+      // Leave browser shortcuts (Cmd/Ctrl+R, Cmd/Ctrl+P, ...) alone
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const key = e.key.toUpperCase();
       if (/^[A-Z]$/.test(key)) {
