@@ -8,7 +8,7 @@ import { StickerBookModal } from './components/StickerBookModal';
 import './App.css';
 
 import { loadData } from './services/dataLoader.ts';
-import { generateCrossword, generateWordSearch } from './services/puzzleGenerator';
+import { generateCrossword, generateWordSearch, getCrosswordMaxSize } from './services/puzzleGenerator';
 import { soundService } from './services/soundService';
 import { THEMES } from './data/themes';
 
@@ -110,27 +110,31 @@ function App() {
         ? themeData.words
         : activeWords;
 
-      // Ensure wordsPool has plenty of candidates for the chosen difficulty
-      const diffMatches = themeWords.filter(w => {
+      const fitsDifficulty = (w: WordEntry) => {
         const len = w.word.length;
         if (settings.difficulty === 'easy') return len >= 3 && len <= 6;
         if (settings.difficulty === 'medium') return len >= 5 && len <= 10;
         return len >= 7 && len <= 15;
-      });
+      };
+      const diffMatches = themeWords.filter(fitsDifficulty);
 
-      const wordsPool = (diffMatches.length < settings.wordCount * 1.5 && activeWords.length > 0)
-        ? [...themeWords, ...activeWords]
+      // Themed puzzles use only their own words. Merging in the whole dictionary
+      // left almost no on-theme words, so only top up a theme that is short.
+      const shortfall = settings.wordCount - diffMatches.length;
+      const wordsPool = (shortfall > 0 && activeWords.length > 0)
+        ? [...themeWords, ...activeWords.filter(fitsDifficulty).sort(() => 0.5 - Math.random()).slice(0, shortfall * 2)]
         : themeWords;
 
       const themeTitle = themeData ? `${themeData.icon} ${themeData.name}` : '🎯 Kids';
 
       if (settings.puzzleType === 'crossword') {
+        const maxSize = getCrosswordMaxSize(settings.difficulty, settings.wordCount);
         const puzzle = generateCrossword(
           wordsPool,
           settings.difficulty,
           `${themeTitle} Crossword`,
-          15,
-          15,
+          maxSize.width,
+          maxSize.height,
           settings.wordCount,
           settings.playMode
         );

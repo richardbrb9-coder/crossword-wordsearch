@@ -8,8 +8,8 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   </React.StrictMode>,
 )
 
-// PWA Service Worker Registration
-if ('serviceWorker' in navigator) {
+// PWA Service Worker Registration (production only, so the dev server is never cached)
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then(
       (registration) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import type { Puzzle, Sticker } from '../types/index.ts';
 import confetti from 'canvas-confetti';
 import { soundService } from '../services/soundService';
@@ -12,6 +12,16 @@ interface WordSearchScreenProps {
 }
 
 const RAINBOW_COLORS = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3', '#33FFF3', '#FF9133', '#9B33FF', '#FF3366', '#33FFB5', '#FFD133', '#B233FF'];
+
+// Dark text on light highlight colors, white text on dark ones
+function readableTextColor(hex: string): string {
+  const value = parseInt(hex.replace('#', ''), 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? '#1e293b' : '#ffffff';
+}
 
 export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenProps) {
   const wordsList = puzzle.clues.across;
@@ -33,6 +43,12 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
   const dragStartRef = useRef<{ row: number; col: number } | null>(null);
   const lastHoveredCellRef = useRef<{ row: number; col: number } | null>(null);
 
+  // The grid is sized to the largest square that fits the board area
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [gridPixelSize, setGridPixelSize] = useState(480);
+  // Letter tapped earlier, waiting for a tap on the word's other end
+  const tapStartRef = useRef<{ row: number; col: number } | null>(null);
+
   // Friendly stopwatch timer for timed mode
   useEffect(() => {
     if (isCompleted || puzzle.playMode !== 'timed') return;
@@ -41,6 +57,19 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
     }, 1000);
     return () => clearInterval(interval);
   }, [isCompleted, puzzle.playMode]);
+
+  // Fit the grid to the board area whenever it resizes (rotation, window resize)
+  useLayoutEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    const updateGridSize = () => {
+      setGridPixelSize(Math.max(260, Math.floor(Math.min(board.clientWidth, board.clientHeight))));
+    };
+    updateGridSize();
+    const observer = new ResizeObserver(updateGridSize);
+    observer.observe(board);
+    return () => observer.disconnect();
+  }, []);
 
   const formatTime = (secs: number): string => {
     const mins = Math.floor(secs / 60);
@@ -144,9 +173,12 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
     return line;
   };
 
-  // Pointer Down - start drag or initial tap
+  // Pointer Down - start drag or tap (decided on pointer up)
   const handlePointerDown = (row: number, col: number, e: React.PointerEvent) => {
     e.preventDefault();
+    // A single letter already selected may be the start of a tap-tap selection
+    tapStartRef.current = selectedCells.length === 1 ? selectedCells[0] ?? null : null;
+
     isDraggingRef.current = true;
     dragStartRef.current = { row, col };
     lastHoveredCellRef.current = { row, col };
@@ -179,10 +211,13 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
     setSelectedCells(line);
   };
 
-  // Pointer Up - check match
+  // Pointer Up - check a dragged line, or finish a tap-tap selection
   const handlePointerUp = () => {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
+    const tapStart = tapStartRef.current;
+    const tapEnd = dragStartRef.current;
+    tapStartRef.current = null;
 
     if (selectedCells.length > 1) {
       const matched = checkMatch(selectedCells);
@@ -190,21 +225,13 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
         // Clear non-matching dragged selection
         setSelectedCells([]);
       }
-    }
-  };
-
-  // Fallback / alternate click handler for tap-start & tap-end
-  const handleCellClick = (row: number, col: number) => {
-    if (isDraggingRef.current) return;
-
-    // If a single cell is currently selected and player clicks another cell
-    if (selectedCells.length === 1 && (selectedCells[0]?.row !== row || selectedCells[0]?.col !== col)) {
-      const startCell = selectedCells[0]!;
-      const line = computeLine(startCell, { row, col });
-      if (checkMatch(line)) {
-        return;
+    } else if (tapStart && tapEnd && (tapStart.row !== tapEnd.row || tapStart.col !== tapEnd.col)) {
+      // Second tap: try the line from the first tapped letter to this one
+      const line = computeLine(tapStart, tapEnd);
+      if (!checkMatch(line)) {
+        // Show the attempted line; the next tap starts a new selection
+        setSelectedCells(line);
       }
-      setSelectedCells(line);
     }
   };
 
@@ -229,7 +256,7 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
     if (selectedCells.some(c => c.row === row && c.col === col)) {
       return { 
         backgroundColor: activeColor, 
-        color: '#000', 
+        color: readableTextColor(activeColor), 
         fontWeight: 'bold', 
         transform: 'scale(1.1)', 
         boxShadow: `0 0 10px ${activeColor}`,
@@ -239,7 +266,7 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
 
     for (const [, data] of Object.entries(foundWords)) {
       if (data.cells.find(c => c.row === row && c.col === col)) {
-        return { backgroundColor: data.color, color: '#fff', fontWeight: 'bold' };
+        return { backgroundColor: data.color, color: readableTextColor(data.color), fontWeight: 'bold' };
       }
     }
     
@@ -264,7 +291,7 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
         </div>
       </div>
 
-      <div className="game-header" style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', alignItems: 'center', width: '100%', maxWidth: '950px', flexWrap: 'wrap', gap: '10px' }}>
+      <div className="game-header ws-header">
         <button onClick={onExit} style={{ background: '#ff4444', color: 'white', padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
           Back to Menu
         </button>
@@ -285,7 +312,7 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
         </div>
 
         {progress > 0 && (
-          <div className="progress-indicator" style={{ flexGrow: 1, margin: '0 12px', minWidth: '160px' }}>
+          <div className="progress-indicator ws-progress">
             <div className="progress-bar">
               <div className="progress-fill" style={{ width: `${progress}%` }} />
             </div>
@@ -325,33 +352,42 @@ export default function WordSearchScreen({ puzzle, onExit }: WordSearchScreenPro
         </div>
       </div>
 
-      <div style={{ margin: '8px 0 14px', fontSize: '1.25rem', color: activeColor, minHeight: '32px', fontWeight: 'bold', letterSpacing: '2px', textAlign: 'center' }}>
-        {currentSpelling ? `Spelling: ${currentSpelling}` : '👆 Drag or tap letters to find hidden words!'}
+      <div className="ws-spelling">
+        {currentSpelling ? (
+          <span className="ws-spelling-word" style={{ backgroundColor: activeColor, color: readableTextColor(activeColor) }}>
+            Spelling: {currentSpelling}
+          </span>
+        ) : '👆 Drag across a word, or tap its first and last letters!'}
       </div>
 
       <div className="game-content wordsearch-content">
-        <div 
-          className="ws-grid" 
-          style={{ gridTemplateColumns: `repeat(${grid[0]?.length || 10}, 1fr)` }}
-          onPointerMove={handleGridPointerMove}
-        >
-          {grid.map((rowArr, rowIndex) => rowArr.map((letter, colIndex) => {
-            const isHint = hintCell?.row === rowIndex && hintCell?.col === colIndex;
-            return (
-              <button 
-                key={`${rowIndex}-${colIndex}`} 
-                type="button" 
-                data-row={rowIndex}
-                data-col={colIndex}
-                className={`ws-cell ${isHint ? 'hint-active' : ''}`} 
-                style={getCellStyle(rowIndex, colIndex)} 
-                onPointerDown={(e) => handlePointerDown(rowIndex, colIndex, e)}
-                onClick={() => handleCellClick(rowIndex, colIndex)}
-              >
-                {letter}
-              </button>
-            );
-          }))}
+        <div className="ws-board" ref={boardRef}>
+          <div 
+            className="ws-grid" 
+            style={{
+              gridTemplateColumns: `repeat(${grid[0]?.length || 10}, 1fr)`,
+              width: `${gridPixelSize}px`,
+              '--ws-cell': `${gridPixelSize / (grid[0]?.length || 10)}px`
+            } as React.CSSProperties}
+            onPointerMove={handleGridPointerMove}
+          >
+            {grid.map((rowArr, rowIndex) => rowArr.map((letter, colIndex) => {
+              const isHint = hintCell?.row === rowIndex && hintCell?.col === colIndex;
+              return (
+                <button 
+                  key={`${rowIndex}-${colIndex}`} 
+                  type="button" 
+                  data-row={rowIndex}
+                  data-col={colIndex}
+                  className={`ws-cell ${isHint ? 'hint-active' : ''}`} 
+                  style={getCellStyle(rowIndex, colIndex)} 
+                  onPointerDown={(e) => handlePointerDown(rowIndex, colIndex, e)}
+                >
+                  {letter}
+                </button>
+              );
+            }))}
+          </div>
         </div>
 
         <div className="clues-section ws-wordbank">

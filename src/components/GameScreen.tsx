@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import type { Puzzle, Clue, Sticker } from '../types/index.ts';
 import confetti from 'canvas-confetti';
 import { soundService } from '../services/soundService';
@@ -28,6 +28,12 @@ const KEYBOARD_ROWS = [
   ['HINT', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'BACKSPACE']
 ];
 
+// Grid cell sizing (px); must match .crossword-grid gap/padding in GameScreen.css
+const GRID_GAP = 3;
+const GRID_PADDING = 6;
+const MIN_CELL_SIZE = 22;
+const MAX_CELL_SIZE = 72;
+
 const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [userGridLetters, setUserGridLetters] = useState<Record<string, string>>({});
@@ -39,6 +45,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
   const [unlockedStickers, setUnlockedStickers] = useState<Sticker[]>([]);
   const [isStickerBookModalOpen, setIsStickerBookModalOpen] = useState(false);
   const solvedCluesRef = useRef<Set<string>>(new Set());
+
+  // Grid cells are sized to fill the board area so the whole puzzle fits on one screen
+  const boardRef = useRef<HTMLDivElement>(null);
+  const clueListRef = useRef<HTMLDivElement>(null);
+  const [cellSize, setCellSize] = useState(40);
 
   // In-grid active cursor & direction
   const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
@@ -120,6 +131,42 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
     return cell.acrossClue || cell.downClue || null;
   }, [activeCell, activeDirection, gridData]);
 
+  // Fit grid cells to the board area whenever it resizes (rotation, window resize)
+  useLayoutEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    const { width: cols, height: rows } = puzzle.gridSize;
+
+    const updateCellSize = () => {
+      const style = getComputedStyle(board);
+      const innerWidth = board.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const innerHeight = board.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+      const fitWidth = (innerWidth - 2 * GRID_PADDING - (cols - 1) * GRID_GAP) / cols;
+      const fitHeight = (innerHeight - 2 * GRID_PADDING - (rows - 1) * GRID_GAP) / rows;
+      const size = Math.floor(Math.min(fitWidth, fitHeight));
+      setCellSize(Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, size)));
+    };
+
+    updateCellSize();
+    const observer = new ResizeObserver(updateCellSize);
+    observer.observe(board);
+    return () => observer.disconnect();
+  }, [puzzle.gridSize]);
+
+  // Keep the selected clue visible in the scrolling clue list
+  useEffect(() => {
+    const list = clueListRef.current;
+    const item = list?.querySelector<HTMLElement>('.active-clue-item');
+    if (!list || !item) return;
+    const listRect = list.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+    if (itemRect.top < listRect.top) {
+      list.scrollTop -= listRect.top - itemRect.top + 8;
+    } else if (itemRect.bottom > listRect.bottom) {
+      list.scrollTop += itemRect.bottom - listRect.bottom + 8;
+    }
+  }, [activeClue?.id]);
+
   const calculateStars = useCallback((): number => {
     if (hintsUsed === 0) return 3;
     if (hintsUsed <= 2) return 2;
@@ -178,7 +225,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
     // Sound effect: chime when any clue is newly completed
     const prevSolved = solvedCluesRef.current;
     const hasNewlySolved = Object.keys(newSolvedClues).some(id => !prevSolved.has(id));
-    if (hasNewlySolved && prevSolved.size > 0) {
+    if (hasNewlySolved) {
       soundService.playSuccess();
     }
     solvedCluesRef.current = new Set(Object.keys(newSolvedClues));
@@ -339,6 +386,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isModalOpen || isCompleted) return;
+      // Leave browser shortcuts (Cmd/Ctrl+R, Cmd/Ctrl+P, ...) alone
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const key = e.key.toUpperCase();
       if (/^[A-Z]$/.test(key)) {
@@ -450,7 +499,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
   };
 
   return (
-    <div className="game-screen">
+    <div className="game-screen crossword-screen">
       {/* Printable Worksheet Header (Only visible when printed) */}
       <div className="print-header">
         <h1>{puzzle.title}</h1>
@@ -461,7 +510,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
         </div>
       </div>
 
-      <div className="game-header" style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+      <div className="game-header cw-header">
         <button 
           onClick={onExit} 
           style={{ background: '#ff4444', color: 'white', padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
@@ -485,7 +534,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
         </div>
 
         {progress > 0 && (
-          <div className="progress-indicator" style={{ flexGrow: 1, margin: '0 12px', minWidth: '180px' }}>
+          <div className="progress-indicator cw-progress">
             <div className="progress-bar">
               <div className="progress-fill" style={{ width: `${progress}%` }} />
             </div>
@@ -515,64 +564,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
         </button>
       </div>
 
-      {/* Pinned Active Clue Banner Above Grid */}
-      {activeClue && (
-        <div className="active-clue-banner">
-          <div className="acb-top">
-            <button 
-              type="button"
-              className="acb-badge" 
-              onClick={handleToggleDirection}
-              title="Click to switch between Across and Down"
-            >
-              <span>{activeClue.direction === 'across' ? '➡️ Across' : '⬇️ Down'} {activeClue.number}</span>
-              <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>({activeClue.length} letters) ⇄</span>
-            </button>
-
-            <div className="acb-actions">
-              <button 
-                type="button"
-                className="acb-btn"
-                onClick={() => speechService.speak(activeClue.question)}
-                title="Read clue aloud"
-              >
-                🔊 Read
-              </button>
-              <button 
-                type="button"
-                className="acb-btn"
-                onClick={handleHintOneLetter}
-                title="Reveal 1 letter in this word"
-                style={{ color: '#f59e0b', fontWeight: 'bold' }}
-              >
-                💡 Hint 1 Letter
-              </button>
-              <button 
-                type="button"
-                className="acb-btn"
-                onClick={openModal}
-                title="Open popup card view"
-              >
-                🔍 Expand
-              </button>
-            </div>
-          </div>
-
-          <p className="acb-question">
-            {activeClue.emoji && puzzle.difficulty === 'easy' && (
-              <span style={{ fontSize: '1.6rem', marginRight: '8px', verticalAlign: 'middle' }}>
-                {activeClue.emoji}
-              </span>
-            )}
-            {activeClue.question}
-          </p>
-        </div>
-      )}
-
-      <div className="game-content">
-        <div className="crossword-container">
+      <div className="cw-layout">
+        <div className="crossword-container cw-board" ref={boardRef}>
           {/* Crossword Grid with Direct Typing */}
-          <div className="crossword-grid" style={{ gridTemplateColumns: `repeat(${puzzle.gridSize.width}, 1fr)` }}>
+          <div
+            className="crossword-grid"
+            style={{ '--cols': puzzle.gridSize.width, '--cell': `${cellSize}px` } as React.CSSProperties}
+          >
             {gridData.map((row, rowIndex) => row.map((cell, colIndex) => {
               const letter = getCellLetter(rowIndex, colIndex);
               const isActive = activeCell?.row === rowIndex && activeCell?.col === colIndex;
@@ -591,56 +589,65 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
               );
             }))}
           </div>
+        </div>
 
-          {/* On-Screen Virtual Keyboard for Tablet & Mobile Kids */}
-          <div className="virtual-keyboard">
-            {KEYBOARD_ROWS.map((row, rIdx) => (
-              <div key={rIdx} className="vk-row">
-                {row.map(key => {
-                  if (key === 'HINT') {
-                    return (
-                      <button 
-                        key={key} 
-                        type="button" 
-                        className="vk-key special-key" 
-                        onClick={handleHintOneLetter}
-                        title="Reveal 1 letter"
-                        style={{ color: '#f59e0b', fontWeight: 'bold' }}
-                      >
-                        💡 Hint
-                      </button>
-                    );
-                  }
-                  if (key === 'BACKSPACE') {
-                    return (
-                      <button 
-                        key={key} 
-                        type="button" 
-                        className="vk-key special-key" 
-                        onClick={handleBackspace}
-                        title="Delete letter"
-                      >
-                        ⌫
-                      </button>
-                    );
-                  }
-                  return (
-                    <button 
-                      key={key} 
-                      type="button" 
-                      className="vk-key" 
-                      onClick={() => handleEnterLetter(key)}
-                    >
-                      {key}
-                    </button>
-                  );
-                })}
+        <div className="cw-side">
+          {/* Pinned Active Clue Banner */}
+          {activeClue && (
+            <div className="active-clue-banner">
+              <div className="acb-top">
+                <button 
+                  type="button"
+                  className="acb-badge" 
+                  onClick={handleToggleDirection}
+                  title="Click to switch between Across and Down"
+                >
+                  <span>{activeClue.direction === 'across' ? '➡️ Across' : '⬇️ Down'} {activeClue.number}</span>
+                  <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>({activeClue.length} letters) ⇄</span>
+                </button>
+
+                <div className="acb-actions">
+                  <button 
+                    type="button"
+                    className="acb-btn"
+                    onClick={() => speechService.speak(activeClue.question)}
+                    title="Read clue aloud"
+                  >
+                    🔊 Read
+                  </button>
+                  <button 
+                    type="button"
+                    className="acb-btn"
+                    onClick={handleHintOneLetter}
+                    title="Reveal 1 letter in this word"
+                    style={{ color: '#f59e0b', fontWeight: 'bold' }}
+                  >
+                    💡 Hint 1 Letter
+                  </button>
+                  <button 
+                    type="button"
+                    className="acb-btn"
+                    onClick={openModal}
+                    title="Open popup card view"
+                  >
+                    🔍 Expand
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
 
-          {/* Clues Section Below */}
-          <div className="clues-section">
+              <p className="acb-question">
+                {activeClue.emoji && puzzle.difficulty === 'easy' && (
+                  <span style={{ fontSize: '1.6rem', marginRight: '8px', verticalAlign: 'middle' }}>
+                    {activeClue.emoji}
+                  </span>
+                )}
+                {activeClue.question}
+              </p>
+            </div>
+          )}
+
+          {/* Clues List (scrolls inside the panel) */}
+          <div className="clues-section" ref={clueListRef}>
             <div className="across-clues">
               <h3>Across</h3>
               <ul>
@@ -712,6 +719,53 @@ const GameScreen: React.FC<GameScreenProps> = ({ puzzle, onExit }) => {
                 })}
               </ul>
             </div>
+          </div>
+
+          {/* On-Screen Virtual Keyboard for Tablet & Mobile Kids */}
+          <div className="virtual-keyboard">
+            {KEYBOARD_ROWS.map((row, rIdx) => (
+              <div key={rIdx} className="vk-row">
+                {row.map(key => {
+                  if (key === 'HINT') {
+                    return (
+                      <button 
+                        key={key} 
+                        type="button" 
+                        className="vk-key special-key" 
+                        onClick={handleHintOneLetter}
+                        title="Reveal 1 letter"
+                        style={{ color: '#f59e0b', fontWeight: 'bold' }}
+                      >
+                        💡 Hint
+                      </button>
+                    );
+                  }
+                  if (key === 'BACKSPACE') {
+                    return (
+                      <button 
+                        key={key} 
+                        type="button" 
+                        className="vk-key special-key" 
+                        onClick={handleBackspace}
+                        title="Delete letter"
+                      >
+                        ⌫
+                      </button>
+                    );
+                  }
+                  return (
+                    <button 
+                      key={key} 
+                      type="button" 
+                      className="vk-key" 
+                      onClick={() => handleEnterLetter(key)}
+                    >
+                      {key}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
       </div>

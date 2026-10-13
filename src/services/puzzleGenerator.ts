@@ -15,6 +15,26 @@ const DIFFICULTY_CONFIG = {
   hard: { minLength: 7, maxLength: 12, maxWordLength: 15 },
 };
 
+const CROSSWORD_BASE_SIZE: Record<Difficulty, { width: number; height: number }> = {
+  easy: { width: 11, height: 10 },
+  medium: { width: 13, height: 12 },
+  hard: { width: 15, height: 14 },
+};
+
+/**
+ * Largest crossword grid allowed for a puzzle. Close to square to match the
+ * board area beside the clue panel on a landscape tablet, so cells stay
+ * finger-sized; puzzles with more words get a little extra room.
+ */
+export function getCrosswordMaxSize(difficulty: Difficulty, wordCount: number): { width: number; height: number } {
+  const base = CROSSWORD_BASE_SIZE[difficulty];
+  const extraWords = Math.max(0, wordCount - 10);
+  return {
+    width: base.width + Math.ceil(extraWords / 4),
+    height: base.height + Math.ceil(extraWords / 4),
+  };
+}
+
 /**
  * Score a word based on its characteristics
  */
@@ -46,16 +66,22 @@ export function getWordDifficulty(entry: WordEntry): Difficulty {
 }
 
 /**
- * Extract words filtered by difficulty
+ * Extract words filtered by difficulty, dropping repeated words
+ * (themed words are merged with the dictionary, which can contain the same word)
  */
 export function extractWords(
   allData: WordEntry[],
   difficulty: Difficulty
 ): WordEntry[] {
-  return allData.filter(entry => 
-    entry.word.length >= DIFFICULTY_CONFIG[difficulty].minLength &&
-    entry.word.length <= DIFFICULTY_CONFIG[difficulty].maxWordLength
-  );
+  const seen = new Set<string>();
+  return allData.filter(entry => {
+    const key = entry.word.toUpperCase();
+    if (seen.has(key)) return false;
+    if (entry.word.length < DIFFICULTY_CONFIG[difficulty].minLength ||
+        entry.word.length > DIFFICULTY_CONFIG[difficulty].maxWordLength) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**
@@ -98,183 +124,198 @@ export function generateCrossword(
   words: WordEntry[],
   difficulty: Difficulty,
   title: string,
-  width: number = 15,
-  height: number = 15,
+  width: number = CROSSWORD_BASE_SIZE[difficulty].width,
+  height: number = CROSSWORD_BASE_SIZE[difficulty].height,
   wordCount: number = 10,
   playMode: PlayMode = 'zen'
 ): Puzzle {
-  const filteredWords = extractWords(words, difficulty);
-  
-  // Working canvas dimension: give ample space so words can branch out freely without hitting boundaries
-  const canvasSize = Math.max(20, Math.ceil(wordCount * 1.35));
-  const cWidth = canvasSize;
-  const cHeight = canvasSize;
+  // width/height are the largest grid allowed; longer words can never fit across
+  const filteredWords = extractWords(words, difficulty).filter(w => w.word.length <= width);
 
-  interface AttemptResult {
-    placedClues: Clue[];
-    grid: string[][];
+  // If not every word fits, one retry is allowed this much extra room
+  const EXTRA_WIDTH = 1;
+  const EXTRA_HEIGHT = 1;
+
+  // Working canvas: the seed word sits in the middle so the puzzle can grow in any
+  // direction up to the size limit, then the used area is cropped out
+  const canvasSize = Math.max(width + EXTRA_WIDTH, height + EXTRA_HEIGHT) * 2 + 2;
+
+  interface Placement {
+    entry: WordEntry;
+    row: number;
+    col: number;
+    dir: 'across' | 'down';
   }
 
-  let bestResult: AttemptResult | null = null;
-  const MAX_ATTEMPTS = 6;
+  interface Bounds {
+    minRow: number;
+    maxRow: number;
+    minCol: number;
+    maxCol: number;
+  }
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const shuffledWords = [...filteredWords].sort(() => 0.5 - Math.random());
-    const candidateWords = shuffledWords.map(w => w.word.toUpperCase());
+  interface AttemptResult {
+    placements: Placement[];
+    bounds: Bounds;
+  }
 
-    const grid: string[][] = Array(cHeight).fill(null).map(() => Array(cWidth).fill(''));
-    const placedClues: Clue[] = [];
+  const boundsArea = (b: Bounds) => (b.maxRow - b.minRow + 1) * (b.maxCol - b.minCol + 1);
 
-    const getCell = (r: number, c: number): string => grid[r]?.[c] ?? '';
-    const setCell = (r: number, c: number, val: string): void => {
-      const row = grid[r];
-      if (row && c >= 0 && c < cWidth) row[c] = val;
-    };
+  const MAX_ATTEMPTS = 20;
+  // Only consider a slice of a large dictionary per attempt to keep generation fast
+  const CANDIDATE_LIMIT = 250;
 
-    const canPlace = (word: string, startRow: number, startCol: number, dir: 'across' | 'down') => {
-      if (dir === 'across' && startCol + word.length > cWidth) return false;
-      if (dir === 'down' && startRow + word.length > cHeight) return false;
+  const findBestLayout = (maxWidth: number, maxHeight: number): AttemptResult | null => {
+    let bestResult: AttemptResult | null = null;
 
-      for (let i = 0; i < word.length; i++) {
-        const r = dir === 'down' ? startRow + i : startRow;
-        const c = dir === 'across' ? startCol + i : startCol;
-        const cell = getCell(r, c);
-        const letter = word[i] ?? '';
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const shuffledWords = [...filteredWords].sort(() => 0.5 - Math.random()).slice(0, CANDIDATE_LIMIT);
 
-        if (cell !== '' && cell !== letter) return false;
+      const grid: string[][] = Array(canvasSize).fill(null).map(() => Array(canvasSize).fill(''));
+      // Which direction(s) each cell is already used in, so words never overlap a parallel word
+      const usedAcross: boolean[][] = Array(canvasSize).fill(null).map(() => Array(canvasSize).fill(false));
+      const usedDown: boolean[][] = Array(canvasSize).fill(null).map(() => Array(canvasSize).fill(false));
+      const occupied: { r: number; c: number }[] = [];
+      const placements: Placement[] = [];
+      const bounds: Bounds = { minRow: Infinity, maxRow: -Infinity, minCol: Infinity, maxCol: -Infinity };
 
-        if (cell === '') {
-          if (dir === 'across') {
-            if (r > 0 && getCell(r - 1, c) !== '') return false;
-            if (r < cHeight - 1 && getCell(r + 1, c) !== '') return false;
+      const getCell = (r: number, c: number): string => grid[r]?.[c] ?? '';
+
+      // Returns the number of crossings with existing words, or -1 if the word can't go here
+      const checkPlacement = (word: string, startRow: number, startCol: number, dir: 'across' | 'down'): number => {
+        const dr = dir === 'down' ? 1 : 0;
+        const dc = dir === 'across' ? 1 : 0;
+        const endRow = startRow + dr * (word.length - 1);
+        const endCol = startCol + dc * (word.length - 1);
+        if (startRow < 0 || startCol < 0 || endRow >= canvasSize || endCol >= canvasSize) return -1;
+
+        // Cells just before and after the word must be empty
+        if (getCell(startRow - dr, startCol - dc) !== '' || getCell(endRow + dr, endCol + dc) !== '') return -1;
+
+        const used = dir === 'across' ? usedAcross : usedDown;
+        let crossings = 0;
+        for (let i = 0; i < word.length; i++) {
+          const r = startRow + dr * i;
+          const c = startCol + dc * i;
+          const cell = getCell(r, c);
+          if (cell === '') {
+            // New letters must not sit side-by-side with other words
+            if (getCell(r + dc, c + dr) !== '' || getCell(r - dc, c - dr) !== '') return -1;
           } else {
-            if (c > 0 && getCell(r, c - 1) !== '') return false;
-            if (c < cWidth - 1 && getCell(r, c + 1) !== '') return false;
+            if (cell !== word[i] || used[r]?.[c]) return -1;
+            crossings++;
           }
         }
+        return crossings;
+      };
+
+      const placeWord = (entry: WordEntry, startRow: number, startCol: number, dir: 'across' | 'down'): void => {
+        const word = entry.word.toUpperCase();
+        const used = dir === 'across' ? usedAcross : usedDown;
+        for (let i = 0; i < word.length; i++) {
+          const r = dir === 'down' ? startRow + i : startRow;
+          const c = dir === 'across' ? startCol + i : startCol;
+          const row = grid[r];
+          const usedRow = used[r];
+          if (!row || !usedRow) continue;
+          if (row[c] === '') occupied.push({ r, c });
+          row[c] = word[i] ?? '';
+          usedRow[c] = true;
+          bounds.minRow = Math.min(bounds.minRow, r);
+          bounds.maxRow = Math.max(bounds.maxRow, r);
+          bounds.minCol = Math.min(bounds.minCol, c);
+          bounds.maxCol = Math.max(bounds.maxCol, c);
+        }
+        placements.push({ entry, row: startRow, col: startCol, dir });
+      };
+
+      // Place seed word across the center
+      const seedEntry = shuffledWords[0];
+      if (seedEntry) {
+        const r = Math.floor(canvasSize / 2);
+        const c = Math.floor((canvasSize - seedEntry.word.length) / 2);
+        placeWord(seedEntry, r, c, 'across');
       }
 
-      if (dir === 'across') {
-        if (startCol > 0 && getCell(startRow, startCol - 1) !== '') return false;
-        if (startCol + word.length < cWidth && getCell(startRow, startCol + word.length) !== '') return false;
-      } else {
-        if (startRow > 0 && getCell(startRow - 1, startCol) !== '') return false;
-        if (startRow + word.length < cHeight && getCell(startRow + word.length, startCol) !== '') return false;
-      }
-      return true;
-    };
+      // Multi-pass placement: words that didn't fit may fit once more letters are on the grid
+      const unplaced = shuffledWords.slice(1);
+      for (let pass = 0; pass < 3 && placements.length < wordCount && unplaced.length > 0; pass++) {
+        let placedAnyInPass = false;
 
-    // Place seed word in the center
-    const seedWord = candidateWords[0];
-    const seedEntry = seedWord ? shuffledWords.find(w => w.word.toUpperCase() === seedWord) : null;
-    if (seedWord && seedEntry) {
-      const r = Math.floor(cHeight / 2);
-      const c = Math.floor((cWidth - seedWord.length) / 2);
-      for (let i = 0; i < seedWord.length; i++) {
-        setCell(r, c + i, seedWord[i] ?? '');
-      }
-      placedClues.push(wordEntryToClue(seedEntry, 'across', 0, r, c));
-    }
+        for (let i = 0; i < unplaced.length && placements.length < wordCount; ) {
+          const entry = unplaced[i];
+          if (!entry) break;
+          const word = entry.word.toUpperCase();
 
-    // Remaining candidates to place
-    const remainingCandidates = candidateWords.slice(1);
-    const unplaced: string[] = [...remainingCandidates];
+          // Try every crossing with every placed letter; keep the spot that keeps the grid smallest
+          let bestSpot: { row: number; col: number; dir: 'across' | 'down'; score: number } | null = null;
+          for (const { r, c } of occupied) {
+            const letter = getCell(r, c);
+            for (let k = 0; k < word.length; k++) {
+              if (word[k] !== letter) continue;
+              for (const dir of ['across', 'down'] as const) {
+                const row = dir === 'down' ? r - k : r;
+                const col = dir === 'across' ? c - k : c;
+                const crossings = checkPlacement(word, row, col, dir);
+                if (crossings < 0) continue;
 
-    // Multi-pass placement: run up to 4 passes over unplaced words as new letters get added
-    for (let pass = 0; pass < 4 && placedClues.length < wordCount && unplaced.length > 0; pass++) {
-      let placedAnyInPass = false;
+                const endRow = dir === 'down' ? row + word.length - 1 : row;
+                const endCol = dir === 'across' ? col + word.length - 1 : col;
+                const newWidth = Math.max(bounds.maxCol, endCol) - Math.min(bounds.minCol, col) + 1;
+                const newHeight = Math.max(bounds.maxRow, endRow) - Math.min(bounds.minRow, row) + 1;
+                if (newWidth > maxWidth || newHeight > maxHeight) continue;
 
-      for (let i = unplaced.length - 1; i >= 0; i--) {
-        if (placedClues.length >= wordCount) break;
-        const word = unplaced[i];
-        if (!word) continue;
-        const entry = shuffledWords.find(w => w.word.toUpperCase() === word);
-        if (!entry) continue;
-
-        let placed = false;
-        for (let r = 0; r < cHeight && !placed; r++) {
-          for (let c = 0; c < cWidth && !placed; c++) {
-            const currentCell = getCell(r, c);
-            if (currentCell !== '') {
-              const matchIndex = word.indexOf(currentCell);
-              if (matchIndex !== -1) {
-                const startRowD = r - matchIndex;
-                if (startRowD >= 0 && canPlace(word, startRowD, c, 'down')) {
-                  for (let k = 0; k < word.length; k++) {
-                    setCell(startRowD + k, c, word[k] ?? '');
-                  }
-                  placedClues.push(wordEntryToClue(entry, 'down', 0, startRowD, c));
-                  placed = true;
-                }
-                if (!placed) {
-                  const startColA = c - matchIndex;
-                  if (startColA >= 0 && canPlace(word, r, startColA, 'across')) {
-                    for (let k = 0; k < word.length; k++) {
-                      setCell(r, startColA + k, word[k] ?? '');
-                    }
-                    placedClues.push(wordEntryToClue(entry, 'across', 0, r, startColA));
-                    placed = true;
-                  }
+                const score = newWidth * newHeight - crossings * 6;
+                if (!bestSpot || score < bestSpot.score) {
+                  bestSpot = { row, col, dir, score };
                 }
               }
             }
           }
+
+          if (bestSpot) {
+            placeWord(entry, bestSpot.row, bestSpot.col, bestSpot.dir);
+            unplaced.splice(i, 1);
+            placedAnyInPass = true;
+          } else {
+            i++;
+          }
         }
 
-        if (placed) {
-          unplaced.splice(i, 1);
-          placedAnyInPass = true;
-        }
+        if (!placedAnyInPass) break;
       }
 
-      if (!placedAnyInPass) break;
-    }
-
-    if (!bestResult || placedClues.length > bestResult.placedClues.length) {
-      bestResult = { placedClues, grid };
-    }
-
-    // If we successfully placed the full requested word count, stop trying!
-    if (placedClues.length >= wordCount) {
-      break;
-    }
-  }
-
-  const finalGrid = bestResult?.grid ?? Array(cHeight).fill(null).map(() => Array(cWidth).fill(''));
-  const finalClues = bestResult?.placedClues ?? [];
-
-  // Bounding Box Cropping: calculate min and max coordinates containing letters
-  let minRow = cHeight;
-  let maxRow = -1;
-  let minCol = cWidth;
-  let maxCol = -1;
-
-  for (let r = 0; r < cHeight; r++) {
-    for (let c = 0; c < cWidth; c++) {
-      if (finalGrid[r]?.[c] && finalGrid[r]![c] !== '') {
-        if (r < minRow) minRow = r;
-        if (r > maxRow) maxRow = r;
-        if (c < minCol) minCol = c;
-        if (c > maxCol) maxCol = c;
+      // Prefer the attempt with the most words, then the most compact grid
+      if (!bestResult ||
+          placements.length > bestResult.placements.length ||
+          (placements.length === bestResult.placements.length && boundsArea(bounds) < boundsArea(bestResult.bounds))) {
+        bestResult = { placements, bounds };
       }
     }
+
+    return bestResult;
+  };
+
+  let bestResult = findBestLayout(width, height);
+  // Small themed word lists can't always fit every word in the limit; give them a little more room
+  if ((bestResult?.placements.length ?? 0) < wordCount) {
+    const roomier = findBestLayout(width + EXTRA_WIDTH, height + EXTRA_HEIGHT);
+    if (roomier && roomier.placements.length > (bestResult?.placements.length ?? 0)) {
+      bestResult = roomier;
+    }
   }
 
-  if (minRow > maxRow || minCol > maxCol) {
-    minRow = 0;
-    maxRow = height - 1;
-    minCol = 0;
-    maxCol = width - 1;
-  }
+  const placements = bestResult?.placements ?? [];
+  const usedBounds = placements.length > 0 ? bestResult?.bounds : undefined;
+  const minRow = usedBounds?.minRow ?? 0;
+  const minCol = usedBounds?.minCol ?? 0;
+  const croppedWidth = usedBounds ? usedBounds.maxCol - minCol + 1 : width;
+  const croppedHeight = usedBounds ? usedBounds.maxRow - minRow + 1 : height;
 
-  const croppedWidth = maxCol - minCol + 1;
-  const croppedHeight = maxRow - minRow + 1;
-
-  // Offset clue coordinates by bounding box origin
-  finalClues.forEach(clue => {
-    clue.row = (clue.row ?? 0) - minRow;
-    clue.col = (clue.col ?? 0) - minCol;
-  });
+  // Build clues with coordinates relative to the cropped grid
+  const finalClues: Clue[] = placements.map(p =>
+    wordEntryToClue(p.entry, p.dir, 0, p.row - minRow, p.col - minCol)
+  );
 
   // Crossword numbering: sort top-to-bottom, left-to-right
   const startPositions: { r: number; c: number }[] = [];

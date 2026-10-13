@@ -410,6 +410,23 @@ button, input, select, textarea {
 }
 
 /* =========================================
+   LOADING SCREEN
+   ========================================= */
+.loading-spinner {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  border: 6px solid var(--border-color);
+  border-top-color: #feca57;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* =========================================
    PRINT WORKSHEET STYLES
    ========================================= */
 .print-header {
@@ -463,16 +480,29 @@ button, input, select, textarea {
     color: #000;
   }
 
+  /* Undo the one-screen tablet layout so the worksheet flows onto paper */
+  .game-screen.crossword-screen {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .cw-layout {
+    display: block !important;
+  }
+
   .crossword-container {
     background: white !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
     margin: 0 auto 24px auto !important;
+    overflow: visible !important;
   }
 
   .crossword-grid {
     border: none !important;
+    --cell: 30px !important;
   }
 
   .crossword-cell:not(.blocked) {
@@ -501,20 +531,69 @@ button, input, select, textarea {
     color: #000 !important;
   }
 
-  .clue-column h3 {
+  .cw-side .clues-section {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    overflow: visible !important;
+  }
+
+  .clues-section ul {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .clues-section li button {
+    display: none !important;
+  }
+
+  .clues-section h3 {
     color: #000 !important;
     border-bottom: 1px solid #000 !important;
     font-size: 14pt !important;
   }
 
-  .clue-list li {
+  .clues-section li {
     color: #000 !important;
     font-size: 10.5pt !important;
     margin-bottom: 6px !important;
   }
 
-  /* Word Search Print */
+  /* Word Search Print: undo the one-screen layout */
+  .game-screen.wordsearch-screen {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .ws-spelling {
+    display: none !important;
+  }
+
+  .wordsearch-content {
+    display: block !important;
+  }
+
+  .ws-board {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .ws-cell {
+    font-size: 14pt !important;
+  }
+
+  .ws-wordbank {
+    width: 100% !important;
+  }
+
+  .ws-wordbank ul {
+    columns: 3;
+  }
+
   .ws-grid {
+    width: 100% !important;
+    max-width: 560px;
     background: white !important;
     border: 2px solid #000 !important;
     box-shadow: none !important;
